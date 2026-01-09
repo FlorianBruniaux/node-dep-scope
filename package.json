@@ -1,0 +1,65 @@
+{
+  "name": "dep-scope",
+  "version": "0.1.0",
+  "description": "Analyze granular dependency usage in TypeScript/JavaScript projects. Find unused symbols, native alternatives, and duplicate libraries.",
+  "keywords": [
+    "dependencies",
+    "analyzer",
+    "audit",
+    "bundle-size",
+    "tree-shaking",
+    "typescript",
+    "javascript",
+    "npm",
+    "unused",
+    "duplicates"
+  ],
+  "author": "Florian Bruniaux",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/florianb/node-dep-scope.git"
+  },
+  "bugs": {
+    "url": "https://github.com/florianb/node-dep-scope/issues"
+  },
+  "homepage": "https://github.com/florianb/node-dep-scope#readme",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "dep-scope": "dist/cli/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build && npm test",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@typescript-eslint/parser": "^8.0.0",
+    "@typescript-eslint/types": "^8.0.0",
+    "commander": "^12.0.0",
+    "fast-glob": "^3.3.0",
+    "jiti": "^2.6.1",
+    "picocolors": "^1.1.0",
+    "yaml": "^2.7.0",
+    "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.3",
+    "@vitest/coverage-v8": "^4.0.16",
+    "typescript": "^5.8.0",
+    "vitest": "^4.0.16"
+  }
+}
