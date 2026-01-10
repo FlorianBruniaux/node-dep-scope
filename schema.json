@@ -1,0 +1,172 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://unpkg.com/dep-scope/schema.json",
+  "title": "dep-scope configuration",
+  "description": "Configuration schema for dep-scope dependency analyzer",
+  "type": "object",
+  "properties": {
+    "srcPaths": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Source paths to scan. Default: [\"./src\"]",
+      "default": ["./src"]
+    },
+    "threshold": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100,
+      "description": "Symbol count threshold for RECODE_NATIVE verdict. Default: 5",
+      "default": 5
+    },
+    "fileCountThreshold": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 50,
+      "description": "Minimum file count to auto-KEEP. Default: 3",
+      "default": 3
+    },
+    "includeDev": {
+      "type": "boolean",
+      "description": "Include devDependencies in analysis. Default: false",
+      "default": false
+    },
+    "ignore": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Packages to ignore (glob patterns supported). Default: []"
+    },
+    "verbose": {
+      "type": "boolean",
+      "description": "Enable verbose output. Default: false",
+      "default": false
+    },
+    "format": {
+      "type": "string",
+      "enum": ["console", "markdown", "json"],
+      "description": "Output format. Default: \"console\"",
+      "default": "console"
+    },
+    "output": {
+      "type": "string",
+      "description": "Output file path for markdown/json format"
+    },
+    "withKnip": {
+      "type": "boolean",
+      "description": "Use Knip for pre-analysis. Default: false",
+      "default": false
+    },
+    "autoDetectWorkspace": {
+      "type": "boolean",
+      "description": "Auto-detect monorepo workspaces. Default: true",
+      "default": true
+    },
+    "wellKnownPatterns": {
+      "type": "array",
+      "description": "Well-known package patterns for automatic KEEP/IGNORE verdicts",
+      "items": {
+        "type": "object",
+        "required": ["pattern", "verdict"],
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Glob pattern to match package names (e.g., \"@types/*\", \"react\")"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": ["KEEP", "IGNORE"],
+            "description": "Verdict to apply when pattern matches"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Human-readable reason for this verdict"
+          }
+        }
+      }
+    },
+    "nativeAlternatives": {
+      "type": "array",
+      "description": "Custom native alternatives to extend built-in rules",
+      "items": {
+        "type": "object",
+        "required": ["package", "symbols"],
+        "properties": {
+          "package": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Package name"
+          },
+          "symbols": {
+            "type": "object",
+            "description": "Symbol to native mapping",
+            "additionalProperties": {
+              "type": "object",
+              "required": ["native", "example"],
+              "properties": {
+                "native": {
+                  "type": "string",
+                  "description": "Native JavaScript/TypeScript replacement"
+                },
+                "example": {
+                  "type": "string",
+                  "description": "Code example showing the native usage"
+                },
+                "minEcmaVersion": {
+                  "type": "string",
+                  "description": "Minimum ECMAScript version required"
+                },
+                "caveats": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "Caveats or limitations of the native approach"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "duplicateCategories": {
+      "type": "array",
+      "description": "Custom duplicate categories to extend built-in detection",
+      "items": {
+        "type": "object",
+        "required": ["name", "description", "packages", "recommendation"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Category name (unique identifier)"
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description"
+          },
+          "packages": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 2,
+            "description": "List of packages in this category"
+          },
+          "recommendation": {
+            "type": "string",
+            "description": "Consolidation recommendation"
+          },
+          "preferredOrder": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Preferred order (first = most recommended)"
+          }
+        }
+      }
+    },
+    "extends": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "array", "items": { "type": "string" } }
+      ],
+      "description": "Presets to inherit configuration from. Available: \"minimal\", \"react\", \"node\""
+    }
+  },
+  "additionalProperties": false
+}

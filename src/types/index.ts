@@ -164,3 +164,46 @@ export interface KnipPreAnalysis {
   /** Whether Knip analysis was successful */
   available: boolean;
 }
+
+// ============================================================================
+// Interface Exports (Phase 1 - Dependency Injection Foundation)
+// ============================================================================
+
+export type {
+  // Core abstractions
+  ILogger,
+  IFileSystem,
+  IFileStats,
+
+  // Analyzers
+  IImportAnalyzer,
+  IPeerDepAnalyzer,
+  IUsageAnalyzer,
+
+  // Reporters
+  IReporter,
+  IConsoleReporter,
+  IMarkdownReporter,
+  IJsonReporter,
+
+  // Data providers
+  INativeAlternativesProvider,
+  IDuplicateCategoriesProvider,
+
+  // Verdict engine (Phase 2)
+  IVerdictEngine,
+  VerdictContext,
+  VerdictResult,
+
+  // Utilities (Phase 2)
+  IPackageJsonReader,
+  PackageJsonContent,
+  ISourceFileScanner,
+  IImportAggregator,
+
+  // Performance (Phase 3)
+  ICache,
+  IFileAnalysisCache,
+  ICacheStats,
+  IParallelProcessor,
+} from "./interfaces.js";

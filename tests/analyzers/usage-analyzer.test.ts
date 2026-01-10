@@ -8,354 +8,7 @@ import fg from "fast-glob";
 vi.mock("node:fs/promises");
 vi.mock("fast-glob");
 
-// We need to test the private determineVerdict method indirectly
-// or extract the logic for testing. For now, we'll create a testable subclass.
-class TestableUsageAnalyzer extends UsageAnalyzer {
-  // Expose private method for testing
-  public testDetermineVerdict(
-    packageName: string,
-    symbolsUsed: SymbolUsage[],
-    alternatives: { symbol: string; native: string; example: string }[],
-    totalImports: number,
-    peerDepInfo?: PeerDependencyInfo
-  ): Verdict {
-    // @ts-expect-error - accessing private method for testing
-    const result = this.determineVerdict(packageName, symbolsUsed, alternatives, totalImports, peerDepInfo);
-    // determineVerdict now returns an object { verdict, investigateReason?, wellKnownReason? }
-    return result.verdict;
-  }
-
-  public testCalculateConfidence(
-    verdict: Verdict,
-    symbolsUsed: SymbolUsage[],
-    alternatives: { symbol: string; native: string; example: string }[],
-    peerDepInfo?: PeerDependencyInfo
-  ): number {
-    // @ts-expect-error - accessing private method for testing
-    return this.calculateConfidence(verdict, symbolsUsed, alternatives, peerDepInfo);
-  }
-}
-
 describe("UsageAnalyzer", () => {
-  describe("determineVerdict", () => {
-    const analyzer = new TestableUsageAnalyzer({ threshold: 5 });
-
-    const makeSymbolUsage = (symbol: string, count = 1): SymbolUsage => ({
-      symbol,
-      importType: "named",
-      locations: [{ file: "/test.ts", line: 1, column: 0 }],
-      count,
-    });
-
-    describe("REMOVE verdict", () => {
-      it("should return REMOVE when no imports and no peer deps", () => {
-        const verdict = analyzer.testDetermineVerdict(
-          "unused-package",
-          [],
-          [],
-          0,
-          undefined
-        );
-        expect(verdict).toBe("REMOVE");
-      });
-
-      it("should return REMOVE when no imports and empty requiredBy", () => {
-        const verdict = analyzer.testDetermineVerdict(
-          "unused-package",
-          [],
-          [],
-          0,
-          { requiredBy: [], onlyPeerDep: false, safeToRemoveFromPackageJson: false }
-        );
-        expect(verdict).toBe("REMOVE");
-      });
-    });
-
-    describe("PEER_DEP verdict", () => {
-      it("should return PEER_DEP when no imports but required by other packages", () => {
-        const verdict = analyzer.testDetermineVerdict(
-          "@ai-sdk/provider",
-          [],
-          [],
-          0,
-          {
-            requiredBy: ["@ai-sdk/openai", "@ai-sdk/anthropic"],
-            onlyPeerDep: true,
-            safeToRemoveFromPackageJson: true,
-          }
-        );
-        expect(verdict).toBe("PEER_DEP");
-      });
-    });
-
-    describe("RECODE_NATIVE verdict", () => {
-      it("should return RECODE_NATIVE when few symbols with alternatives", () => {
-        const symbolsUsed = [makeSymbolUsage("v4")];
-        const alternatives = [
-          { symbol: "v4", native: "crypto.randomUUID()", example: "crypto.randomUUID()" },
-        ];
-
-        const verdict = analyzer.testDetermineVerdict(
-          "uuid",
-          symbolsUsed,
-          alternatives,
-          1,
-          undefined
-        );
-        expect(verdict).toBe("RECODE_NATIVE");
-      });
-
-      it("should return RECODE_NATIVE when symbols <= threshold and 50%+ have alternatives", () => {
-        const symbolsUsed = [
-          makeSymbolUsage("get"),
-          makeSymbolUsage("set"),
-        ];
-        const alternatives = [
-          { symbol: "get", native: "Optional chaining", example: "obj?.a?.b" },
-        ];
-
-        const verdict = analyzer.testDetermineVerdict(
-          "lodash",
-          symbolsUsed,
-          alternatives,
-          2,
-          undefined
-        );
-        expect(verdict).toBe("RECODE_NATIVE");
-      });
-
-      it("should NOT return RECODE_NATIVE when symbols > threshold", () => {
-        const symbolsUsed = Array.from({ length: 6 }, (_, i) =>
-          makeSymbolUsage(`symbol${i}`)
-        );
-        const alternatives = symbolsUsed.map((s) => ({
-          symbol: s.symbol,
-          native: "native",
-          example: "example",
-        }));
-
-        const verdict = analyzer.testDetermineVerdict(
-          "lodash",
-          symbolsUsed,
-          alternatives,
-          6,
-          undefined
-        );
-        expect(verdict).toBe("KEEP");
-      });
-
-      it("should NOT return RECODE_NATIVE when < 50% have alternatives", () => {
-        const symbolsUsed = [
-          makeSymbolUsage("get"),
-          makeSymbolUsage("set"),
-          makeSymbolUsage("merge"),
-          makeSymbolUsage("cloneDeep"),
-        ];
-        const alternatives = [
-          { symbol: "get", native: "Optional chaining", example: "obj?.a?.b" },
-        ];
-
-        const verdict = analyzer.testDetermineVerdict(
-          "lodash",
-          symbolsUsed,
-          alternatives,
-          4,
-          undefined
-        );
-        // 1/4 = 25% < 50%, so should be KEEP
-        expect(verdict).toBe("KEEP");
-      });
-    });
-
-    describe("INVESTIGATE verdict", () => {
-      it("should return INVESTIGATE when few symbols and no alternatives", () => {
-        const symbolsUsed = [makeSymbolUsage("obscureFunction")];
-
-        const verdict = analyzer.testDetermineVerdict(
-          "some-package",
-          symbolsUsed,
-          [],
-          1,
-          undefined
-        );
-        expect(verdict).toBe("INVESTIGATE");
-      });
-
-      it("should return INVESTIGATE when 2 symbols and no alternatives", () => {
-        const symbolsUsed = [
-          makeSymbolUsage("func1"),
-          makeSymbolUsage("func2"),
-        ];
-
-        const verdict = analyzer.testDetermineVerdict(
-          "some-package",
-          symbolsUsed,
-          [],
-          2,
-          undefined
-        );
-        expect(verdict).toBe("INVESTIGATE");
-      });
-    });
-
-    describe("KEEP verdict", () => {
-      it("should return KEEP when many symbols used", () => {
-        const symbolsUsed = Array.from({ length: 10 }, (_, i) =>
-          makeSymbolUsage(`symbol${i}`)
-        );
-
-        const verdict = analyzer.testDetermineVerdict(
-          "well-used-package",
-          symbolsUsed,
-          [],
-          10,
-          undefined
-        );
-        expect(verdict).toBe("KEEP");
-      });
-
-      it("should return KEEP when symbols > threshold even with some alternatives", () => {
-        const symbolsUsed = Array.from({ length: 8 }, (_, i) =>
-          makeSymbolUsage(`symbol${i}`)
-        );
-        const alternatives = [
-          { symbol: "symbol0", native: "native", example: "example" },
-        ];
-
-        const verdict = analyzer.testDetermineVerdict(
-          "package",
-          symbolsUsed,
-          alternatives,
-          8,
-          undefined
-        );
-        expect(verdict).toBe("KEEP");
-      });
-
-      it("should return KEEP when 3+ symbols with no alternatives", () => {
-        const symbolsUsed = [
-          makeSymbolUsage("func1"),
-          makeSymbolUsage("func2"),
-          makeSymbolUsage("func3"),
-        ];
-
-        const verdict = analyzer.testDetermineVerdict(
-          "some-package",
-          symbolsUsed,
-          [],
-          3,
-          undefined
-        );
-        expect(verdict).toBe("KEEP");
-      });
-    });
-
-    describe("threshold configuration", () => {
-      it("should respect custom threshold", () => {
-        const customAnalyzer = new TestableUsageAnalyzer({ threshold: 3 });
-        const symbolsUsed = [
-          makeSymbolUsage("a"),
-          makeSymbolUsage("b"),
-          makeSymbolUsage("c"),
-          makeSymbolUsage("d"),
-        ];
-        const alternatives = symbolsUsed.map((s) => ({
-          symbol: s.symbol,
-          native: "native",
-          example: "example",
-        }));
-
-        const verdict = customAnalyzer.testDetermineVerdict(
-          "package",
-          symbolsUsed,
-          alternatives,
-          4,
-          undefined
-        );
-        // 4 symbols > threshold of 3, so KEEP
-        expect(verdict).toBe("KEEP");
-      });
-    });
-  });
-
-  describe("calculateConfidence", () => {
-    const analyzer = new TestableUsageAnalyzer();
-
-    const makeSymbolUsage = (symbol: string): SymbolUsage => ({
-      symbol,
-      importType: "named",
-      locations: [{ file: "/test.ts", line: 1, column: 0 }],
-      count: 1,
-    });
-
-    it("should return 1.0 for REMOVE verdict", () => {
-      const confidence = analyzer.testCalculateConfidence("REMOVE", [], []);
-      expect(confidence).toBe(1.0);
-    });
-
-    it("should return 0.9 for KEEP verdict", () => {
-      const confidence = analyzer.testCalculateConfidence(
-        "KEEP",
-        [makeSymbolUsage("a")],
-        []
-      );
-      expect(confidence).toBe(0.9);
-    });
-
-    it("should return 0.5 for INVESTIGATE verdict", () => {
-      const confidence = analyzer.testCalculateConfidence(
-        "INVESTIGATE",
-        [makeSymbolUsage("a")],
-        []
-      );
-      expect(confidence).toBe(0.5);
-    });
-
-    it("should return high confidence for PEER_DEP with requiredBy", () => {
-      const confidence = analyzer.testCalculateConfidence(
-        "PEER_DEP",
-        [],
-        [],
-        { requiredBy: ["pkg1"], onlyPeerDep: true, safeToRemoveFromPackageJson: true }
-      );
-      expect(confidence).toBe(0.95);
-    });
-
-    it("should return lower confidence for PEER_DEP without requiredBy", () => {
-      const confidence = analyzer.testCalculateConfidence(
-        "PEER_DEP",
-        [],
-        [],
-        { requiredBy: [], onlyPeerDep: true, safeToRemoveFromPackageJson: true }
-      );
-      expect(confidence).toBe(0.7);
-    });
-
-    it("should scale RECODE_NATIVE confidence based on alternatives coverage", () => {
-      const symbolsUsed = [makeSymbolUsage("a"), makeSymbolUsage("b")];
-      const allAlternatives = [
-        { symbol: "a", native: "n", example: "e" },
-        { symbol: "b", native: "n", example: "e" },
-      ];
-      const halfAlternatives = [{ symbol: "a", native: "n", example: "e" }];
-
-      const fullConfidence = analyzer.testCalculateConfidence(
-        "RECODE_NATIVE",
-        symbolsUsed,
-        allAlternatives
-      );
-      const halfConfidence = analyzer.testCalculateConfidence(
-        "RECODE_NATIVE",
-        symbolsUsed,
-        halfAlternatives
-      );
-
-      expect(fullConfidence).toBeGreaterThan(halfConfidence);
-      expect(fullConfidence).toBe(1.0);
-      expect(halfConfidence).toBe(0.75);
-    });
-  });
-
   describe("constructor options", () => {
     it("should use default options when not provided", () => {
       const analyzer = new UsageAnalyzer();
@@ -368,6 +21,20 @@ describe("UsageAnalyzer", () => {
         srcPaths: ["./custom"],
         threshold: 10,
       });
+      expect(analyzer).toBeInstanceOf(UsageAnalyzer);
+    });
+
+    it("should accept custom dependencies", () => {
+      const mockLogger = {
+        log: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        debug: vi.fn(),
+        setVerbose: vi.fn(),
+        isVerbose: vi.fn(() => false),
+      };
+
+      const analyzer = new UsageAnalyzer({}, { logger: mockLogger });
       expect(analyzer).toBeInstanceOf(UsageAnalyzer);
     });
   });
@@ -453,21 +120,43 @@ describe("UsageAnalyzer", () => {
     });
 
     it("should include devDependencies when includeDev is true", async () => {
-      setupMocks(
-        mockPackageJson({ lodash: "^4.0.0" }, { typescript: "^5.0.0" }),
-        [],
-        ""
-      );
+      const mockPackageJsonReader = {
+        read: vi.fn().mockResolvedValue({
+          name: "test-project",
+          dependencies: { lodash: "^4.0.0" },
+          devDependencies: { "custom-dev": "^5.0.0" },
+        }),
+        getDependencies: vi.fn().mockResolvedValue({ lodash: "^4.0.0" }),
+        getDevDependencies: vi.fn().mockResolvedValue({ "custom-dev": "^5.0.0" }),
+      };
 
-      const analyzer = new UsageAnalyzer({
-        includeDev: true,
-        ignore: [],
-        wellKnownPatterns: [], // Disable default patterns (typescript is in DEFAULT_WELL_KNOWN_PATTERNS as IGNORE)
-      });
+      const mockSourceFileScanner = {
+        scan: vi.fn().mockResolvedValue([]),
+        validatePaths: vi.fn().mockResolvedValue(["./src"]),
+      };
+
+      const mockPeerDepAnalyzer = {
+        analyzePeerDeps: vi.fn().mockResolvedValue(new Map()),
+        checkPackagePeerDeps: vi.fn(),
+        clearCache: vi.fn(),
+      };
+
+      const analyzer = new UsageAnalyzer(
+        {
+          includeDev: true,
+          ignore: [],
+          wellKnownPatterns: [], // Disable default patterns
+        },
+        {
+          packageJsonReader: mockPackageJsonReader,
+          sourceFileScanner: mockSourceFileScanner,
+          peerDepAnalyzer: mockPeerDepAnalyzer,
+        }
+      );
 
       const results = await analyzer.scanProject("/project");
 
-      expect(results.map((r) => r.name)).toContain("typescript");
+      expect(results.map((r) => r.name)).toContain("custom-dev");
     });
 
     it("should sort results by verdict priority", async () => {
@@ -518,6 +207,94 @@ describe("UsageAnalyzer", () => {
       expect(results.map((r) => r.name)).not.toContain("@types/react");
       expect(results.map((r) => r.name)).toContain("lodash");
     });
+
+    it("should delegate to injected components", async () => {
+      const mockImportAnalyzer = {
+        analyzeFile: vi.fn().mockResolvedValue([]),
+        analyzeContent: vi.fn().mockReturnValue([]),
+        extractPackageName: vi.fn(),
+        determineImportStyle: vi.fn(),
+      };
+
+      setupMocks(
+        mockPackageJson({ lodash: "^4.0.0" }),
+        ["/project/src/index.ts"],
+        `import { get } from "lodash";`
+      );
+
+      const analyzer = new UsageAnalyzer(
+        { ignore: [] },
+        { importAnalyzer: mockImportAnalyzer }
+      );
+
+      await analyzer.scanProject("/project");
+
+      expect(mockImportAnalyzer.analyzeFile).toHaveBeenCalled();
+    });
+
+    it("should use wellKnownPatterns from options", async () => {
+      const mockPackageJsonReader = {
+        read: vi.fn().mockResolvedValue({
+          name: "test-project",
+          dependencies: {
+            "@custom/internal": "^1.0.0",
+            lodash: "^4.0.0",
+          },
+        }),
+        getDependencies: vi.fn().mockResolvedValue({
+          "@custom/internal": "^1.0.0",
+          lodash: "^4.0.0",
+        }),
+        getDevDependencies: vi.fn().mockResolvedValue({}),
+      };
+
+      const mockSourceFileScanner = {
+        scan: vi.fn().mockResolvedValue(["/project/src/index.ts"]),
+        validatePaths: vi.fn().mockResolvedValue(["./src"]),
+      };
+
+      const mockPeerDepAnalyzer = {
+        analyzePeerDeps: vi.fn().mockResolvedValue(new Map()),
+        checkPackagePeerDeps: vi.fn(),
+        clearCache: vi.fn(),
+      };
+
+      const mockImportAnalyzer = {
+        analyzeFile: vi.fn().mockResolvedValue([
+          {
+            packageName: "@custom/internal",
+            symbol: "x",
+            importPath: "@custom/internal",
+            importType: "named",
+            location: { file: "/project/src/index.ts", line: 1, column: 0 },
+          },
+        ]),
+        analyzeContent: vi.fn(),
+        extractPackageName: vi.fn(),
+        determineImportStyle: vi.fn(),
+      };
+
+      const analyzer = new UsageAnalyzer(
+        {
+          ignore: [],
+          wellKnownPatterns: [
+            { pattern: "@custom/*", verdict: "KEEP", reason: "Internal packages" },
+          ],
+        },
+        {
+          packageJsonReader: mockPackageJsonReader,
+          sourceFileScanner: mockSourceFileScanner,
+          peerDepAnalyzer: mockPeerDepAnalyzer,
+          importAnalyzer: mockImportAnalyzer,
+        }
+      );
+
+      const results = await analyzer.scanProject("/project");
+      const customPkg = results.find((r) => r.name === "@custom/internal");
+
+      expect(customPkg?.verdict).toBe("KEEP");
+      expect(customPkg?.wellKnownReason).toBe("Internal packages");
+    });
   });
 
   describe("analyzeSingleDependency", () => {
@@ -526,26 +303,65 @@ describe("UsageAnalyzer", () => {
     });
 
     it("should analyze a single package in detail", async () => {
-      vi.mocked(fs.readFile).mockImplementation(async (filePath) => {
-        const path = filePath.toString();
-        if (path.endsWith("package.json") && !path.includes("node_modules")) {
-          return JSON.stringify({
-            name: "test-project",
-            dependencies: { lodash: "^4.17.21" },
-          });
-        }
-        if (path.endsWith(".ts")) {
-          return `
-            import { get, set, debounce } from "lodash";
-            const x = get(obj, "a.b");
-          `;
-        }
-        throw new Error("ENOENT");
-      });
+      const mockPackageJsonReader = {
+        read: vi.fn().mockResolvedValue({
+          name: "test-project",
+          dependencies: { lodash: "^4.17.21" },
+          devDependencies: {},
+        }),
+        getDependencies: vi.fn().mockResolvedValue({ lodash: "^4.17.21" }),
+        getDevDependencies: vi.fn().mockResolvedValue({}),
+      };
 
-      vi.mocked(fg).mockResolvedValue(["/project/src/index.ts", "/project/src/utils.ts"]);
+      const mockSourceFileScanner = {
+        scan: vi.fn().mockResolvedValue(["/project/src/index.ts", "/project/src/utils.ts"]),
+        validatePaths: vi.fn().mockResolvedValue(["./src"]),
+      };
 
-      const analyzer = new UsageAnalyzer();
+      const mockImportAnalyzer = {
+        analyzeFile: vi.fn().mockResolvedValue([
+          {
+            packageName: "lodash",
+            symbol: "get",
+            importPath: "lodash",
+            importType: "named",
+            location: { file: "/project/src/index.ts", line: 1, column: 0 },
+          },
+          {
+            packageName: "lodash",
+            symbol: "set",
+            importPath: "lodash",
+            importType: "named",
+            location: { file: "/project/src/index.ts", line: 1, column: 0 },
+          },
+          {
+            packageName: "lodash",
+            symbol: "debounce",
+            importPath: "lodash",
+            importType: "named",
+            location: { file: "/project/src/utils.ts", line: 1, column: 0 },
+          },
+        ]),
+        analyzeContent: vi.fn(),
+        extractPackageName: vi.fn(),
+        determineImportStyle: vi.fn(),
+      };
+
+      const mockPeerDepAnalyzer = {
+        analyzePeerDeps: vi.fn().mockResolvedValue(new Map()),
+        checkPackagePeerDeps: vi.fn(),
+        clearCache: vi.fn(),
+      };
+
+      const analyzer = new UsageAnalyzer(
+        { ignore: [] },
+        {
+          packageJsonReader: mockPackageJsonReader,
+          sourceFileScanner: mockSourceFileScanner,
+          importAnalyzer: mockImportAnalyzer,
+          peerDepAnalyzer: mockPeerDepAnalyzer,
+        }
+      );
       const result = await analyzer.analyzeSingleDependency("/project", "lodash");
 
       expect(result.name).toBe("lodash");
@@ -572,6 +388,155 @@ describe("UsageAnalyzer", () => {
       await expect(
         analyzer.analyzeSingleDependency("/project", "unknown-pkg")
       ).rejects.toThrow('Package "unknown-pkg" not found');
+    });
+
+    it("should find package in devDependencies", async () => {
+      const mockPackageJsonReader = {
+        read: vi.fn().mockResolvedValue({
+          name: "test-project",
+          dependencies: {},
+          devDependencies: { vitest: "^1.0.0" },
+        }),
+        getDependencies: vi.fn().mockResolvedValue({}),
+        getDevDependencies: vi.fn().mockResolvedValue({ vitest: "^1.0.0" }),
+      };
+
+      const mockSourceFileScanner = {
+        scan: vi.fn().mockResolvedValue(["/project/src/test.ts"]),
+        validatePaths: vi.fn().mockResolvedValue(["./src"]),
+      };
+
+      const mockImportAnalyzer = {
+        analyzeFile: vi.fn().mockResolvedValue([
+          {
+            packageName: "vitest",
+            symbol: "describe",
+            importPath: "vitest",
+            importType: "named",
+            location: { file: "/project/src/test.ts", line: 1, column: 0 },
+          },
+        ]),
+        analyzeContent: vi.fn(),
+        extractPackageName: vi.fn(),
+        determineImportStyle: vi.fn(),
+      };
+
+      const analyzer = new UsageAnalyzer(
+        {},
+        {
+          packageJsonReader: mockPackageJsonReader,
+          sourceFileScanner: mockSourceFileScanner,
+          importAnalyzer: mockImportAnalyzer,
+        }
+      );
+
+      const result = await analyzer.analyzeSingleDependency("/project", "vitest");
+
+      expect(result.name).toBe("vitest");
+    });
+  });
+
+  describe("Knip integration", () => {
+    it("should expose isKnipFlaggedUnused method", () => {
+      const analyzer = new UsageAnalyzer();
+      expect(typeof analyzer.isKnipFlaggedUnused).toBe("function");
+    });
+
+    it("should return false when Knip is not enabled", () => {
+      const analyzer = new UsageAnalyzer({ withKnip: false });
+      expect(analyzer.isKnipFlaggedUnused("any-package")).toBe(false);
+    });
+
+    it("should expose getKnipAnalysis method", () => {
+      const analyzer = new UsageAnalyzer();
+      expect(typeof analyzer.getKnipAnalysis).toBe("function");
+    });
+
+    it("should return null when Knip is not run", () => {
+      const analyzer = new UsageAnalyzer();
+      expect(analyzer.getKnipAnalysis()).toBeNull();
+    });
+  });
+
+  describe("dependency injection", () => {
+    it("should accept all dependencies via constructor", () => {
+      const mockLogger = {
+        log: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        debug: vi.fn(),
+        setVerbose: vi.fn(),
+        isVerbose: vi.fn(() => false),
+      };
+
+      const mockImportAnalyzer = {
+        analyzeFile: vi.fn().mockResolvedValue([]),
+        analyzeContent: vi.fn().mockReturnValue([]),
+        extractPackageName: vi.fn(),
+        determineImportStyle: vi.fn(),
+      };
+
+      const mockPeerDepAnalyzer = {
+        analyzePeerDeps: vi.fn().mockResolvedValue(new Map()),
+        checkPackagePeerDeps: vi.fn().mockResolvedValue({
+          requiredBy: [],
+          onlyPeerDep: false,
+          safeToRemoveFromPackageJson: false,
+        }),
+        clearCache: vi.fn(),
+      };
+
+      const mockVerdictEngine = {
+        determineVerdict: vi.fn().mockReturnValue({ verdict: "KEEP" }),
+        calculateConfidence: vi.fn().mockReturnValue(0.9),
+        isActionable: vi.fn().mockReturnValue(false),
+        getVerdictPriority: vi.fn().mockReturnValue(5),
+        compareVerdicts: vi.fn().mockReturnValue(0),
+        getInvestigateReasonDescription: vi.fn().mockReturnValue(""),
+      };
+
+      const mockPackageJsonReader = {
+        read: vi.fn().mockResolvedValue({
+          name: "test",
+          dependencies: { lodash: "^4.0.0" },
+        }),
+        getDependencies: vi.fn().mockResolvedValue({ lodash: "^4.0.0" }),
+        getDevDependencies: vi.fn().mockResolvedValue({}),
+      };
+
+      const mockSourceFileScanner = {
+        scan: vi.fn().mockResolvedValue([]),
+        validatePaths: vi.fn().mockResolvedValue(["./src"]),
+      };
+
+      const mockImportAggregator = {
+        groupByPackage: vi.fn().mockReturnValue(new Map()),
+        aggregateSymbols: vi.fn().mockReturnValue([]),
+        getUniqueFiles: vi.fn().mockReturnValue([]),
+        determineImportStyle: vi.fn().mockReturnValue("barrel" as const),
+      };
+
+      const analyzer = new UsageAnalyzer(
+        {},
+        {
+          logger: mockLogger,
+          importAnalyzer: mockImportAnalyzer,
+          peerDepAnalyzer: mockPeerDepAnalyzer,
+          verdictEngine: mockVerdictEngine,
+          packageJsonReader: mockPackageJsonReader,
+          sourceFileScanner: mockSourceFileScanner,
+          importAggregator: mockImportAggregator,
+        }
+      );
+
+      expect(analyzer).toBeInstanceOf(UsageAnalyzer);
+    });
+  });
+
+  describe("default instance", () => {
+    it("should export a default instance", async () => {
+      const { usageAnalyzer } = await import("../../src/analyzers/usage-analyzer.js");
+      expect(usageAnalyzer).toBeInstanceOf(UsageAnalyzer);
     });
   });
 });

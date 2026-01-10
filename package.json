@@ -32,9 +32,21 @@
   },
   "files": [
     "dist",
+    "schema.json",
     "README.md",
     "LICENSE"
   ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./config": {
+      "types": "./dist/config/index.d.ts",
+      "import": "./dist/config/index.js"
+    },
+    "./schema.json": "./schema.json"
+  },
   "engines": {
     "node": ">=18.0.0"
   },

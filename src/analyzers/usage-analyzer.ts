@@ -1,44 +1,68 @@
 /**
  * Usage Analyzer
+ * Phase 2.5 - Refactored as orchestrator using extracted components
  * Aggregates import information into dependency analysis
  */
 
-import fg from "fast-glob";
-import * as fs from "node:fs/promises";
-import * as path from "node:path";
-import { importAnalyzer } from "./import-analyzer.js";
-import { peerDepAnalyzer } from "./peer-dep-analyzer.js";
-import {
-  PackageJsonNotFoundError,
-  InvalidPackageJsonError,
-  SourcePathNotFoundError,
-  PackageNotFoundError,
-} from "../errors/index.js";
+import { ImportAnalyzer, importAnalyzer as defaultImportAnalyzer } from "./import-analyzer.js";
+import { PeerDepAnalyzer, peerDepAnalyzer as defaultPeerDepAnalyzer } from "./peer-dep-analyzer.js";
+import { VerdictEngine, verdictEngine as defaultVerdictEngine } from "./verdict-engine.js";
+import { PackageNotFoundError } from "../errors/index.js";
 import type {
   AnalyzerOptions,
   DependencyAnalysis,
   ImportInfo,
-  InvestigateReason,
   KnipPreAnalysis,
-  NativeAlternative,
-  PeerDependencyInfo,
-  SymbolUsage,
-  Verdict,
+  ILogger,
+  IImportAnalyzer,
+  IPeerDepAnalyzer,
+  IVerdictEngine,
+  IPackageJsonReader,
+  ISourceFileScanner,
+  IImportAggregator,
+  VerdictContext,
 } from "../types/index.js";
 import { getNativeAlternatives } from "../rules/native-alternatives.js";
 import { hasDuplicatesInstalled } from "../rules/duplicate-categories.js";
 import { runKnipAnalysis, formatKnipSummary } from "../integrations/knip.js";
 import { detectWorkspace } from "../utils/workspace-detector.js";
-import { matchWellKnownPackage, shouldIgnoreWellKnown } from "../rules/well-known-packages.js";
-import type { WellKnownPattern } from "../config/schema.js";
+import { shouldIgnoreWellKnown } from "../rules/well-known-packages.js";
 import { DEFAULT_WELL_KNOWN_PATTERNS } from "../config/defaults.js";
+import { PackageJsonReader, packageJsonReader as defaultPackageJsonReader } from "../utils/package-json-reader.js";
+import { SourceFileScanner, sourceFileScanner as defaultSourceFileScanner } from "../utils/source-file-scanner.js";
+import { ImportAggregator, importAggregator as defaultImportAggregator } from "../utils/import-aggregator.js";
+import { ConsoleLogger } from "../utils/logger.js";
+
+/**
+ * Usage Analyzer Dependencies
+ */
+export interface UsageAnalyzerDependencies {
+  logger?: ILogger;
+  importAnalyzer?: IImportAnalyzer;
+  peerDepAnalyzer?: IPeerDepAnalyzer;
+  verdictEngine?: IVerdictEngine;
+  packageJsonReader?: IPackageJsonReader;
+  sourceFileScanner?: ISourceFileScanner;
+  importAggregator?: IImportAggregator;
+}
 
 export class UsageAnalyzer {
   private options: AnalyzerOptions;
-
   private knipAnalysis: KnipPreAnalysis | null = null;
 
-  constructor(options: Partial<AnalyzerOptions> = {}) {
+  // Injected dependencies
+  private readonly logger: ILogger;
+  private readonly importAnalyzer: IImportAnalyzer;
+  private readonly peerDepAnalyzer: IPeerDepAnalyzer;
+  private readonly verdictEngine: IVerdictEngine;
+  private readonly packageJsonReader: IPackageJsonReader;
+  private readonly sourceFileScanner: ISourceFileScanner;
+  private readonly importAggregator: IImportAggregator;
+
+  constructor(
+    options: Partial<AnalyzerOptions> = {},
+    deps: UsageAnalyzerDependencies = {}
+  ) {
     this.options = {
       srcPaths: ["./src"],
       threshold: 5,
@@ -51,6 +75,15 @@ export class UsageAnalyzer {
       wellKnownPatterns: DEFAULT_WELL_KNOWN_PATTERNS,
       ...options,
     };
+
+    // Initialize dependencies with defaults
+    this.logger = deps.logger ?? new ConsoleLogger({ verbose: this.options.verbose });
+    this.importAnalyzer = deps.importAnalyzer ?? defaultImportAnalyzer;
+    this.peerDepAnalyzer = deps.peerDepAnalyzer ?? defaultPeerDepAnalyzer;
+    this.verdictEngine = deps.verdictEngine ?? defaultVerdictEngine;
+    this.packageJsonReader = deps.packageJsonReader ?? defaultPackageJsonReader;
+    this.sourceFileScanner = deps.sourceFileScanner ?? defaultSourceFileScanner;
+    this.importAggregator = deps.importAggregator ?? defaultImportAggregator;
   }
 
   /**
@@ -59,28 +92,11 @@ export class UsageAnalyzer {
   async scanProject(projectPath: string): Promise<DependencyAnalysis[]> {
     // Run Knip pre-analysis if enabled
     if (this.options.withKnip) {
-      if (this.options.verbose) {
-        console.log("Running Knip pre-analysis...");
-      }
-      const knipResult = await runKnipAnalysis(projectPath);
-
-      if (knipResult.available) {
-        this.knipAnalysis = {
-          unusedDependencies: knipResult.unusedDependencies,
-          unusedDevDependencies: knipResult.unusedDevDependencies,
-          available: true,
-        };
-        if (this.options.verbose) {
-          console.log(formatKnipSummary(knipResult));
-        }
-      } else {
-        console.warn(`Warning: ${knipResult.error}`);
-        this.knipAnalysis = null;
-      }
+      await this.runKnipPreAnalysis(projectPath);
     }
 
     // Read and validate package.json
-    const packageJson = await this.readPackageJson(projectPath);
+    const packageJson = await this.packageJsonReader.read(projectPath);
 
     const allDeps = {
       ...packageJson.dependencies,
@@ -88,56 +104,36 @@ export class UsageAnalyzer {
     };
 
     // Auto-detect monorepo workspace if using default srcPaths
-    if (
-      this.options.autoDetectWorkspace &&
-      this.options.srcPaths.length === 1 &&
-      this.options.srcPaths[0] === "./src"
-    ) {
-      const workspace = await detectWorkspace(projectPath);
-      if (workspace.type !== "none") {
-        this.options.srcPaths = workspace.srcPaths;
-        if (this.options.verbose) {
-          console.log(`Detected ${workspace.type} workspace: ${workspace.patterns.join(", ")}`);
-          console.log(`Scanning ${workspace.packages.length} packages...`);
-        }
-      }
-    }
+    await this.autoDetectWorkspace(projectPath);
 
     // Validate and get source files
-    await this.validateSourcePaths(projectPath);
-    const sourceFiles = await this.getSourceFiles(projectPath);
+    this.options.srcPaths = await this.sourceFileScanner.validatePaths(
+      projectPath,
+      this.options.srcPaths,
+      { autoDetectWorkspace: this.options.autoDetectWorkspace }
+    );
 
-    if (this.options.verbose) {
-      console.log(`Found ${sourceFiles.length} source files`);
-    }
+    const sourceFiles = await this.sourceFileScanner.scan(
+      projectPath,
+      this.options.srcPaths,
+      this.options.ignore
+    );
+
+    this.logger.debug(`Found ${sourceFiles.length} source files`);
 
     if (sourceFiles.length === 0) {
-      console.warn(
+      this.logger.warn(
         `Warning: No source files found in ${this.options.srcPaths.join(", ")}. ` +
           `Check your --src option.`
       );
     }
 
     // Analyze all imports
-    const allImports: ImportInfo[] = [];
-    for (const file of sourceFiles) {
-      try {
-        const imports = await importAnalyzer.analyzeFile(file);
-        allImports.push(...imports);
-      } catch (error) {
-        // Log but don't fail on individual file errors
-        if (this.options.verbose) {
-          console.warn(`Warning: Could not analyze ${file}`);
-        }
-      }
-    }
-
-    if (this.options.verbose) {
-      console.log(`Found ${allImports.length} total imports`);
-    }
+    const allImports = await this.collectImports(sourceFiles);
+    this.logger.debug(`Found ${allImports.length} total imports`);
 
     // Group imports by package
-    const importsByPackage = this.groupImportsByPackage(allImports);
+    const importsByPackage = this.importAggregator.groupByPackage(allImports);
 
     // Filter to only installed dependencies (with glob pattern support)
     const installedPackages = Object.keys(allDeps).filter(
@@ -145,10 +141,8 @@ export class UsageAnalyzer {
     );
 
     // Analyze peer dependencies
-    if (this.options.verbose) {
-      console.log("Analyzing peer dependencies...");
-    }
-    const peerDepMap = await peerDepAnalyzer.analyzePeerDeps(
+    this.logger.debug("Analyzing peer dependencies...");
+    const peerDepMap = await this.peerDepAnalyzer.analyzePeerDeps(
       projectPath,
       installedPackages
     );
@@ -169,29 +163,12 @@ export class UsageAnalyzer {
     }
 
     // Post-process: Update verdict to CONSOLIDATE for packages in duplicate categories
-    // This ensures packages don't appear in both "Investigate" and "Duplicates" sections
-    for (const analysis of analyses) {
-      const duplicateCategory = hasDuplicatesInstalled(
-        analysis.name,
-        installedPackages
-      );
-      if (duplicateCategory && analysis.verdict !== "REMOVE" && analysis.verdict !== "PEER_DEP") {
-        analysis.verdict = "CONSOLIDATE";
-      }
-    }
+    this.applyConsolidateVerdicts(analyses, installedPackages);
 
     // Sort by verdict priority
-    return analyses.sort((a, b) => {
-      const priority: Record<Verdict, number> = {
-        REMOVE: 0,
-        PEER_DEP: 1,
-        RECODE_NATIVE: 2,
-        CONSOLIDATE: 3,
-        INVESTIGATE: 4,
-        KEEP: 5,
-      };
-      return priority[a.verdict] - priority[b.verdict];
-    });
+    return analyses.sort((a, b) =>
+      this.verdictEngine.compareVerdicts(a.verdict, b.verdict)
+    );
   }
 
   /**
@@ -201,7 +178,7 @@ export class UsageAnalyzer {
     projectPath: string,
     packageName: string
   ): Promise<DependencyAnalysis> {
-    const packageJson = await this.readPackageJson(projectPath);
+    const packageJson = await this.packageJsonReader.read(projectPath);
 
     const version =
       packageJson.dependencies?.[packageName] ??
@@ -211,12 +188,23 @@ export class UsageAnalyzer {
       throw new PackageNotFoundError(packageName, projectPath);
     }
 
-    const sourceFiles = await this.getSourceFiles(projectPath);
+    // Validate source paths first
+    this.options.srcPaths = await this.sourceFileScanner.validatePaths(
+      projectPath,
+      this.options.srcPaths,
+      { autoDetectWorkspace: this.options.autoDetectWorkspace }
+    );
+
+    const sourceFiles = await this.sourceFileScanner.scan(
+      projectPath,
+      this.options.srcPaths,
+      this.options.ignore
+    );
 
     const allImports: ImportInfo[] = [];
     for (const file of sourceFiles) {
       try {
-        const imports = await importAnalyzer.analyzeFile(file);
+        const imports = await this.importAnalyzer.analyzeFile(file);
         const packageImports = imports.filter((i) => i.packageName === packageName);
         allImports.push(...packageImports);
       } catch {
@@ -228,64 +216,83 @@ export class UsageAnalyzer {
   }
 
   /**
-   * Read and validate package.json
+   * Check if Knip flagged this dependency as unused
    */
-  private async readPackageJson(projectPath: string): Promise<{
-    dependencies?: Record<string, string>;
-    devDependencies?: Record<string, string>;
-  }> {
-    const packageJsonPath = path.join(projectPath, "package.json");
+  isKnipFlaggedUnused(packageName: string): boolean {
+    if (!this.knipAnalysis?.available) return false;
+    return (
+      this.knipAnalysis.unusedDependencies.has(packageName) ||
+      this.knipAnalysis.unusedDevDependencies.has(packageName)
+    );
+  }
 
-    let content: string;
-    try {
-      content = await fs.readFile(packageJsonPath, "utf-8");
-    } catch (error) {
-      throw new PackageJsonNotFoundError(projectPath);
-    }
+  /**
+   * Get Knip analysis results
+   */
+  getKnipAnalysis(): KnipPreAnalysis | null {
+    return this.knipAnalysis;
+  }
 
-    try {
-      return JSON.parse(content);
-    } catch (error) {
-      throw new InvalidPackageJsonError(
-        projectPath,
-        error instanceof Error ? error.message : "Invalid JSON"
-      );
+  // ============================================================================
+  // Private Methods
+  // ============================================================================
+
+  /**
+   * Run Knip pre-analysis
+   */
+  private async runKnipPreAnalysis(projectPath: string): Promise<void> {
+    this.logger.debug("Running Knip pre-analysis...");
+    const knipResult = await runKnipAnalysis(projectPath);
+
+    if (knipResult.available) {
+      this.knipAnalysis = {
+        unusedDependencies: knipResult.unusedDependencies,
+        unusedDevDependencies: knipResult.unusedDevDependencies,
+        available: true,
+      };
+      this.logger.debug(formatKnipSummary(knipResult));
+    } else {
+      this.logger.warn(`Warning: ${knipResult.error}`);
+      this.knipAnalysis = null;
     }
   }
 
   /**
-   * Validate that source paths exist
-   * In monorepo mode (autoDetectWorkspace), filters out non-existent paths
-   * In explicit mode (--src provided), throws error if path doesn't exist
+   * Auto-detect monorepo workspace
    */
-  private async validateSourcePaths(projectPath: string): Promise<void> {
-    const validPaths: string[] = [];
+  private async autoDetectWorkspace(projectPath: string): Promise<void> {
+    if (
+      this.options.autoDetectWorkspace &&
+      this.options.srcPaths.length === 1 &&
+      this.options.srcPaths[0] === "./src"
+    ) {
+      const workspace = await detectWorkspace(projectPath);
+      if (workspace.type !== "none") {
+        this.options.srcPaths = workspace.srcPaths;
+        this.logger.debug(
+          `Detected ${workspace.type} workspace: ${workspace.patterns.join(", ")}`
+        );
+        this.logger.debug(`Scanning ${workspace.packages.length} packages...`);
+      }
+    }
+  }
 
-    for (const srcPath of this.options.srcPaths) {
-      const fullPath = path.join(projectPath, srcPath);
+  /**
+   * Collect imports from all source files
+   */
+  private async collectImports(sourceFiles: string[]): Promise<ImportInfo[]> {
+    const allImports: ImportInfo[] = [];
+
+    for (const file of sourceFiles) {
       try {
-        const stat = await fs.stat(fullPath);
-        if (stat.isDirectory()) {
-          validPaths.push(srcPath);
-        }
-      } catch {
-        // In monorepo mode, skip non-existent paths silently
-        // (some packages may not have src/ or lib/)
-        if (!this.options.autoDetectWorkspace) {
-          throw new SourcePathNotFoundError(srcPath, projectPath);
-        }
+        const imports = await this.importAnalyzer.analyzeFile(file);
+        allImports.push(...imports);
+      } catch (error) {
+        this.logger.debug(`Warning: Could not analyze ${file}`);
       }
     }
 
-    // Must have at least one valid path
-    if (validPaths.length === 0) {
-      throw new SourcePathNotFoundError(
-        this.options.srcPaths.join(", "),
-        projectPath
-      );
-    }
-
-    this.options.srcPaths = validPaths;
+    return allImports;
   }
 
   /**
@@ -313,89 +320,22 @@ export class UsageAnalyzer {
   }
 
   /**
-   * Get all TypeScript/JavaScript source files
-   */
-  private async getSourceFiles(projectPath: string): Promise<string[]> {
-    const patterns = this.options.srcPaths.map((srcPath) =>
-      path.join(projectPath, srcPath, "**/*.{ts,tsx,js,jsx,mjs,cjs}")
-    );
-
-    // Build ignore patterns for fast-glob
-    // Always ignore node_modules at any depth to handle monorepo sub-packages
-    const ignorePatterns = [
-      "**/node_modules/**",
-      ...this.options.ignore
-        .filter((p) => p !== "node_modules") // Already handled above
-        .map((p) => `**/${p}/**`),
-    ];
-
-    return fg(patterns, {
-      ignore: ignorePatterns,
-      absolute: true,
-      onlyFiles: true,
-    });
-  }
-
-  /**
-   * Group imports by package name
-   */
-  private groupImportsByPackage(
-    imports: ImportInfo[]
-  ): Map<string, ImportInfo[]> {
-    const grouped = new Map<string, ImportInfo[]>();
-
-    for (const imp of imports) {
-      const existing = grouped.get(imp.packageName) ?? [];
-      existing.push(imp);
-      grouped.set(imp.packageName, existing);
-    }
-
-    return grouped;
-  }
-
-  /**
    * Analyze a single dependency
    */
   private analyzeDependency(
     packageName: string,
     version: string,
     imports: ImportInfo[],
-    peerDepInfo?: PeerDependencyInfo
+    peerDepInfo?: { requiredBy: string[]; onlyPeerDep: boolean; safeToRemoveFromPackageJson: boolean }
   ): DependencyAnalysis {
-    // Aggregate symbol usage
-    const symbolMap = new Map<string, SymbolUsage>();
-
-    for (const imp of imports) {
-      const existing = symbolMap.get(imp.symbol);
-      if (existing) {
-        existing.locations.push(imp.location);
-        existing.count++;
-      } else {
-        symbolMap.set(imp.symbol, {
-          symbol: imp.symbol,
-          importType: imp.importType,
-          locations: [imp.location],
-          count: 1,
-        });
-      }
-    }
-
-    const symbolsUsed = Array.from(symbolMap.values()).sort(
-      (a, b) => b.count - a.count
-    );
+    // Aggregate symbol usage using ImportAggregator
+    const symbolsUsed = this.importAggregator.aggregateSymbols(imports);
 
     // Determine import style
-    const hasBarrel = imports.some(
-      (i) => importAnalyzer.determineImportStyle(i.importPath, packageName) === "barrel"
-    );
-    const hasDirect = imports.some(
-      (i) => importAnalyzer.determineImportStyle(i.importPath, packageName) === "direct"
-    );
-    const importStyle: "barrel" | "direct" | "mixed" =
-      hasBarrel && hasDirect ? "mixed" : hasBarrel ? "barrel" : "direct";
+    const importStyle = this.importAggregator.determineImportStyle(imports, packageName);
 
     // Get unique files
-    const files = [...new Set(imports.map((i) => i.location.file))];
+    const files = this.importAggregator.getUniqueFiles(imports);
 
     // Get native alternatives
     const alternatives = getNativeAlternatives(packageName, symbolsUsed);
@@ -408,14 +348,29 @@ export class UsageAnalyzer {
         }
       : undefined;
 
-    // Determine verdict
-    const verdictResult = this.determineVerdict(
+    // Build verdict context
+    const verdictContext: VerdictContext = {
       packageName,
       symbolsUsed,
       alternatives,
-      imports.length,
-      updatedPeerDepInfo,
-      files.length
+      totalImports: imports.length,
+      peerDepInfo: updatedPeerDepInfo,
+      fileCount: files.length,
+      options: {
+        threshold: this.options.threshold,
+        fileCountThreshold: this.options.fileCountThreshold,
+        wellKnownPatterns: this.options.wellKnownPatterns,
+      },
+      knipFlaggedUnused: this.isKnipFlaggedUnused(packageName),
+    };
+
+    // Determine verdict using VerdictEngine
+    const verdictResult = this.verdictEngine.determineVerdict(verdictContext);
+
+    // Calculate confidence
+    const confidence = this.verdictEngine.calculateConfidence(
+      { ...verdictContext, knipAnalysis: this.knipAnalysis },
+      verdictResult
     );
 
     return {
@@ -425,7 +380,7 @@ export class UsageAnalyzer {
       symbolsUsed,
       totalSymbolsUsed: symbolsUsed.length,
       verdict: verdictResult.verdict,
-      confidence: this.calculateConfidence(verdictResult.verdict, symbolsUsed, alternatives, updatedPeerDepInfo, packageName),
+      confidence,
       alternatives,
       peerDepInfo: updatedPeerDepInfo,
       files,
@@ -436,153 +391,34 @@ export class UsageAnalyzer {
   }
 
   /**
-   * Determine verdict for a dependency
+   * Apply CONSOLIDATE verdicts for duplicate packages
    */
-  private determineVerdict(
-    packageName: string,
-    symbolsUsed: SymbolUsage[],
-    alternatives: NativeAlternative[],
-    totalImports: number,
-    peerDepInfo?: PeerDependencyInfo,
-    fileCount?: number
-  ): { verdict: Verdict; investigateReason?: InvestigateReason; wellKnownReason?: string } {
-    // Check wellKnownPatterns for KEEP verdict (highest priority after REMOVE/PEER_DEP)
-    const wellKnownMatch = matchWellKnownPackage(
-      packageName,
-      this.options.wellKnownPatterns ?? []
-    );
-    if (wellKnownMatch && wellKnownMatch.verdict === "KEEP") {
-      return { verdict: "KEEP", wellKnownReason: wellKnownMatch.reason };
-    }
-
-    // Check if Knip flagged this as unused (higher confidence)
-    const knipFlaggedUnused =
-      this.knipAnalysis?.available &&
-      (this.knipAnalysis.unusedDependencies.has(packageName) ||
-        this.knipAnalysis.unusedDevDependencies.has(packageName));
-
-    // No imports - check if it's a peer dependency
-    if (totalImports === 0) {
-      // If it's required by other packages, it's a peer dep (redundant in package.json)
-      if (peerDepInfo && peerDepInfo.requiredBy.length > 0) {
-        return { verdict: "PEER_DEP" };
+  private applyConsolidateVerdicts(
+    analyses: DependencyAnalysis[],
+    installedPackages: string[]
+  ): void {
+    for (const analysis of analyses) {
+      const duplicateCategory = hasDuplicatesInstalled(
+        analysis.name,
+        installedPackages
+      );
+      if (
+        duplicateCategory &&
+        analysis.verdict !== "REMOVE" &&
+        analysis.verdict !== "PEER_DEP"
+      ) {
+        analysis.verdict = "CONSOLIDATE";
       }
-      return { verdict: "REMOVE" };
     }
-
-    // If Knip says unused but we found imports, investigate (potential config/dynamic usage)
-    if (knipFlaggedUnused && totalImports > 0) {
-      // Knip might be right (config file usage), but we found actual imports
-      // This is interesting: dep-scope found usage that Knip missed
-      // Keep as is, but this case is logged for debugging
-    }
-
-    // Few symbols with alternatives = recode native
-    if (
-      symbolsUsed.length <= this.options.threshold &&
-      alternatives.length > 0 &&
-      alternatives.length >= symbolsUsed.length * 0.5
-    ) {
-      return { verdict: "RECODE_NATIVE" };
-    }
-
-    // Well-used across many files = keep (regardless of symbol count)
-    // This handles UI component libraries like @radix-ui/* that export 1-2 symbols by design
-    const fileThreshold = this.options.fileCountThreshold ?? 3;
-    if (fileCount !== undefined && fileCount >= fileThreshold) {
-      return { verdict: "KEEP" };
-    }
-
-    // Few symbols but no alternatives = investigate with reason
-    if (symbolsUsed.length <= 2 && alternatives.length === 0) {
-      let investigateReason: InvestigateReason;
-      if (fileCount === 1) {
-        investigateReason = "SINGLE_FILE_USAGE";
-      } else if (fileCount !== undefined && fileCount < fileThreshold) {
-        investigateReason = "LOW_FILE_SPREAD";
-      } else {
-        investigateReason = "LOW_SYMBOL_COUNT";
-      }
-      return { verdict: "INVESTIGATE", investigateReason };
-    }
-
-    // Well-used = keep
-    return { verdict: "KEEP" };
-  }
-
-  /**
-   * Check if Knip flagged this dependency as unused
-   */
-  isKnipFlaggedUnused(packageName: string): boolean {
-    if (!this.knipAnalysis?.available) return false;
-    return (
-      this.knipAnalysis.unusedDependencies.has(packageName) ||
-      this.knipAnalysis.unusedDevDependencies.has(packageName)
-    );
-  }
-
-  /**
-   * Get Knip analysis results
-   */
-  getKnipAnalysis(): KnipPreAnalysis | null {
-    return this.knipAnalysis;
-  }
-
-  /**
-   * Calculate confidence score for verdict
-   */
-  private calculateConfidence(
-    verdict: Verdict,
-    symbolsUsed: SymbolUsage[],
-    alternatives: NativeAlternative[],
-    peerDepInfo?: PeerDependencyInfo,
-    packageName?: string
-  ): number {
-    // Knip validation boosts confidence
-    const knipConfirms =
-      packageName &&
-      this.knipAnalysis?.available &&
-      (verdict === "REMOVE" || verdict === "PEER_DEP") &&
-      (this.knipAnalysis.unusedDependencies.has(packageName) ||
-        this.knipAnalysis.unusedDevDependencies.has(packageName));
-
-    let confidence: number;
-
-    switch (verdict) {
-      case "REMOVE":
-        confidence = 1.0; // Very confident if no imports
-        break;
-
-      case "PEER_DEP":
-        // High confidence if we found packages that depend on it
-        confidence = peerDepInfo && peerDepInfo.requiredBy.length > 0 ? 0.95 : 0.7;
-        break;
-
-      case "RECODE_NATIVE":
-        // Higher confidence if all symbols have alternatives
-        const coverage = alternatives.length / Math.max(symbolsUsed.length, 1);
-        confidence = Math.min(0.5 + coverage * 0.5, 1.0);
-        break;
-
-      case "INVESTIGATE":
-        confidence = 0.5; // Uncertain
-        break;
-
-      case "KEEP":
-        confidence = 0.9; // Pretty confident
-        break;
-
-      default:
-        confidence = 0.5;
-    }
-
-    // Boost confidence if Knip confirms our verdict
-    if (knipConfirms) {
-      confidence = Math.min(confidence + 0.05, 1.0);
-    }
-
-    return confidence;
   }
 }
 
+// ============================================================================
+// Default Instance (for backwards compatibility)
+// ============================================================================
+
+/**
+ * Default usage analyzer instance
+ * @deprecated Use dependency injection with UsageAnalyzer constructor instead
+ */
 export const usageAnalyzer = new UsageAnalyzer();

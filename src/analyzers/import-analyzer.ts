@@ -7,16 +7,83 @@
 import { parse } from "@typescript-eslint/parser";
 import { AST_NODE_TYPES } from "@typescript-eslint/types";
 import type { TSESTree } from "@typescript-eslint/types";
-import * as fs from "node:fs/promises";
-import type { ImportInfo, ImportType, Location } from "../types/index.js";
+import type { ImportInfo, ImportType, Location, IFileSystem, ILogger, IFileAnalysisCache } from "../types/index.js";
+import { NodeFileSystem } from "../utils/filesystem.js";
+import { ConsoleLogger } from "../utils/logger.js";
+import { FileAnalysisCache } from "../utils/cache.js";
+
+/**
+ * Import Analyzer Dependencies
+ */
+export interface ImportAnalyzerDependencies {
+  fileSystem?: IFileSystem;
+  logger?: ILogger;
+  cache?: IFileAnalysisCache;
+}
+
+/**
+ * Import Analyzer Options
+ */
+export interface ImportAnalyzerOptions {
+  /** Enable caching of analysis results (default: true) */
+  enableCache?: boolean;
+}
 
 export class ImportAnalyzer {
+  private readonly fileSystem: IFileSystem;
+  private readonly logger: ILogger;
+  private readonly cache: IFileAnalysisCache;
+  private readonly enableCache: boolean;
+
+  constructor(
+    options: ImportAnalyzerOptions = {},
+    deps: ImportAnalyzerDependencies = {}
+  ) {
+    this.fileSystem = deps.fileSystem ?? new NodeFileSystem();
+    this.logger = deps.logger ?? new ConsoleLogger();
+    this.cache = deps.cache ?? new FileAnalysisCache({ logger: this.logger });
+    this.enableCache = options.enableCache ?? true;
+  }
+
   /**
    * Analyze a single file and extract all imports
+   * Uses mtime-based caching for performance optimization
    */
   async analyzeFile(filePath: string): Promise<ImportInfo[]> {
-    const content = await fs.readFile(filePath, "utf-8");
+    // Try cache first if enabled
+    if (this.enableCache) {
+      const stats = await this.fileSystem.stat(filePath);
+      const mtime = stats.mtime;
+
+      const cached = this.cache.getIfValid(filePath, mtime);
+      if (cached !== undefined) {
+        return cached;
+      }
+
+      // Cache miss - parse and store
+      const content = await this.fileSystem.readFile(filePath, "utf-8");
+      const imports = this.analyzeContent(content, filePath);
+      this.cache.setWithMtime(filePath, imports, mtime);
+      return imports;
+    }
+
+    // No caching - direct parse
+    const content = await this.fileSystem.readFile(filePath, "utf-8");
     return this.analyzeContent(content, filePath);
+  }
+
+  /**
+   * Get cache statistics (for monitoring/debugging)
+   */
+  getCacheStats(): { hits: number; misses: number; size: number; hitRate: number } {
+    return this.cache.getStats();
+  }
+
+  /**
+   * Clear the analysis cache
+   */
+  clearCache(): void {
+    this.cache.clear();
   }
 
   /**
@@ -37,7 +104,7 @@ export class ImportAnalyzer {
       this.traverseNode(ast, imports, filePath);
     } catch (error) {
       // Skip files that can't be parsed (e.g., invalid syntax)
-      console.warn(`Warning: Could not parse ${filePath}`);
+      this.logger.warn(`Warning: Could not parse ${filePath}`);
     }
 
     return imports;
@@ -291,4 +358,12 @@ export class ImportAnalyzer {
   }
 }
 
+// ============================================================================
+// Default Instance (for backwards compatibility)
+// ============================================================================
+
+/**
+ * Default import analyzer instance
+ * @deprecated Use dependency injection with ImportAnalyzer constructor instead
+ */
 export const importAnalyzer = new ImportAnalyzer();

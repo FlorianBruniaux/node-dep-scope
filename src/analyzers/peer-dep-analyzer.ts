@@ -3,9 +3,10 @@
  * Checks if packages are required by other packages as peer/transitive dependencies
  */
 
-import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { PeerDependencyInfo } from "../types/index.js";
+import type { PeerDependencyInfo, IFileSystem, ILogger } from "../types/index.js";
+import { NodeFileSystem } from "../utils/filesystem.js";
+import { ConsoleLogger } from "../utils/logger.js";
 
 interface PackageJson {
   name?: string;
@@ -16,8 +17,23 @@ interface PackageJson {
   optionalDependencies?: Record<string, string>;
 }
 
+/**
+ * Peer Dependency Analyzer Dependencies
+ */
+export interface PeerDepAnalyzerDependencies {
+  fileSystem?: IFileSystem;
+  logger?: ILogger;
+}
+
 export class PeerDepAnalyzer {
+  private readonly fileSystem: IFileSystem;
+  private readonly logger: ILogger;
   private cache: Map<string, PackageJson | null> = new Map();
+
+  constructor(deps: PeerDepAnalyzerDependencies = {}) {
+    this.fileSystem = deps.fileSystem ?? new NodeFileSystem();
+    this.logger = deps.logger ?? new ConsoleLogger();
+  }
 
   /**
    * Analyze peer dependencies for all packages in the project
@@ -125,12 +141,13 @@ export class PeerDepAnalyzer {
     try {
       // Handle scoped packages
       const pkgPath = path.join(nodeModulesPath, packageName, "package.json");
-      const content = await fs.readFile(pkgPath, "utf-8");
+      const content = await this.fileSystem.readFile(pkgPath, "utf-8");
       const parsed = JSON.parse(content) as PackageJson;
       this.cache.set(cacheKey, parsed);
       return parsed;
-    } catch {
+    } catch (error) {
       // Package might not exist or package.json might be missing
+      this.logger.debug(`Could not read package.json for ${packageName}: ${error}`);
       this.cache.set(cacheKey, null);
       return null;
     }
@@ -144,4 +161,12 @@ export class PeerDepAnalyzer {
   }
 }
 
+// ============================================================================
+// Default Instance (for backwards compatibility)
+// ============================================================================
+
+/**
+ * Default peer dependency analyzer instance
+ * @deprecated Use dependency injection with PeerDepAnalyzer constructor instead
+ */
 export const peerDepAnalyzer = new PeerDepAnalyzer();

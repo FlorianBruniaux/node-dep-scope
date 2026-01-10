@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { ImportAnalyzer } from "../../src/analyzers/import-analyzer.js";
+import type { IFileSystem, IFileStats, IFileAnalysisCache, ICacheStats, ImportInfo } from "../../src/types/index.js";
 
 describe("ImportAnalyzer", () => {
   const analyzer = new ImportAnalyzer();
@@ -453,6 +454,127 @@ import { useQuery } from "@tanstack/react-query";
         expect(imports.find((i) => i.packageName === "lodash")).toBeDefined();
         expect(imports.find((i) => i.packageName === "axios")).toBeDefined();
       });
+    });
+  });
+
+  describe("caching", () => {
+    const createMockFileSystem = (
+      content: string,
+      mtime: Date = new Date()
+    ): IFileSystem => ({
+      readFile: vi.fn().mockResolvedValue(content),
+      stat: vi.fn().mockResolvedValue({
+        isDirectory: () => false,
+        isFile: () => true,
+        mtime,
+        size: content.length,
+      } as IFileStats),
+      readdir: vi.fn().mockResolvedValue([]),
+      exists: vi.fn().mockResolvedValue(true),
+    });
+
+    const createMockCache = (): IFileAnalysisCache & {
+      getIfValid: ReturnType<typeof vi.fn>;
+      setWithMtime: ReturnType<typeof vi.fn>;
+    } => ({
+      get: vi.fn(),
+      set: vi.fn(),
+      has: vi.fn(),
+      delete: vi.fn(),
+      clear: vi.fn(),
+      size: 0,
+      getIfValid: vi.fn().mockReturnValue(undefined),
+      setWithMtime: vi.fn(),
+      getStats: vi.fn().mockReturnValue({ hits: 0, misses: 0, size: 0, hitRate: 0 }),
+    });
+
+    it("should use cache when enabled", async () => {
+      const mockCache = createMockCache();
+      const cachedImports: ImportInfo[] = [
+        {
+          packageName: "react",
+          symbol: "useState",
+          importPath: "react",
+          importType: "named",
+          location: { file: "/test.ts", line: 1, column: 0 },
+        },
+      ];
+      mockCache.getIfValid.mockReturnValue(cachedImports);
+
+      const mockFs = createMockFileSystem(`import { useState } from "react";`);
+
+      const analyzer = new ImportAnalyzer(
+        { enableCache: true },
+        { fileSystem: mockFs, cache: mockCache }
+      );
+
+      const result = await analyzer.analyzeFile("/test.ts");
+
+      expect(mockCache.getIfValid).toHaveBeenCalled();
+      expect(mockFs.readFile).not.toHaveBeenCalled(); // Should use cache, not read file
+      expect(result).toEqual(cachedImports);
+    });
+
+    it("should store in cache on cache miss", async () => {
+      const mockCache = createMockCache();
+      mockCache.getIfValid.mockReturnValue(undefined); // Cache miss
+
+      const content = `import { useState } from "react";`;
+      const mtime = new Date("2024-01-01");
+      const mockFs = createMockFileSystem(content, mtime);
+
+      const analyzer = new ImportAnalyzer(
+        { enableCache: true },
+        { fileSystem: mockFs, cache: mockCache }
+      );
+
+      await analyzer.analyzeFile("/test.ts");
+
+      expect(mockFs.readFile).toHaveBeenCalledWith("/test.ts", "utf-8");
+      expect(mockCache.setWithMtime).toHaveBeenCalled();
+      const [filePath, imports, storedMtime] = mockCache.setWithMtime.mock.calls[0];
+      expect(filePath).toBe("/test.ts");
+      expect(imports).toHaveLength(1);
+      expect(imports[0].packageName).toBe("react");
+      expect(storedMtime).toEqual(mtime);
+    });
+
+    it("should bypass cache when disabled", async () => {
+      const mockCache = createMockCache();
+      const content = `import { useState } from "react";`;
+      const mockFs = createMockFileSystem(content);
+
+      const analyzer = new ImportAnalyzer(
+        { enableCache: false },
+        { fileSystem: mockFs, cache: mockCache }
+      );
+
+      await analyzer.analyzeFile("/test.ts");
+
+      expect(mockCache.getIfValid).not.toHaveBeenCalled();
+      expect(mockCache.setWithMtime).not.toHaveBeenCalled();
+      expect(mockFs.readFile).toHaveBeenCalled();
+    });
+
+    it("should expose cache stats", () => {
+      const mockCache = createMockCache();
+      mockCache.getStats.mockReturnValue({ hits: 5, misses: 2, size: 3, hitRate: 0.714 });
+
+      const analyzer = new ImportAnalyzer({}, { cache: mockCache });
+      const stats = analyzer.getCacheStats();
+
+      expect(stats.hits).toBe(5);
+      expect(stats.misses).toBe(2);
+      expect(stats.hitRate).toBeCloseTo(0.714, 2);
+    });
+
+    it("should allow clearing cache", () => {
+      const mockCache = createMockCache();
+      const analyzer = new ImportAnalyzer({}, { cache: mockCache });
+
+      analyzer.clearCache();
+
+      expect(mockCache.clear).toHaveBeenCalled();
     });
   });
 });
