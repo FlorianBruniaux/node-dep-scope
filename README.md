@@ -78,6 +78,9 @@ Scans all dependencies and outputs a summary with verdicts.
 | `-v, --verbose` | Verbose output | `false` |
 | `--ignore <packages...>` | Packages to ignore | none |
 | `--with-knip` | Use Knip for pre-analysis | `false` |
+| `--actionable-only` | Show only actionable items (hide INVESTIGATE) | `false` |
+| `--no-config` | Ignore config file | `false` |
+| `--no-auto-detect` | Disable monorepo workspace auto-detection | `false` |
 
 **Examples:**
 ```bash
@@ -132,6 +135,19 @@ dep-scope report -o ./audit.md
 dep-scope report -p ./my-project -f json -o ./audit.json
 ```
 
+### `init` - Create config file
+
+```bash
+dep-scope init [options]
+```
+
+Creates a `.depscoperc.json` config file with sensible defaults.
+
+**Options:**
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-p, --path <path>` | Project path | Current directory |
+
 ## Configuration
 
 dep-scope supports configuration files for persistent settings and customization.
@@ -143,7 +159,7 @@ Config files are detected in this order:
 1. `.depscoperc`
 2. `.depscoperc.json`
 3. `depscope.config.json`
-4. `depscope.config.yaml`
+4. `depscope.config.yaml` / `depscope.config.yml`
 5. `depscope.config.ts`
 6. `depscope.config.js` / `.mjs` / `.cjs`
 7. `package.json` → `depScope` field
@@ -158,7 +174,9 @@ Config files are detected in this order:
   "includeDev": false,
   "ignore": ["@internal/*"],
   "format": "console",
-  "verbose": false
+  "verbose": false,
+  "fileCountThreshold": 3,
+  "autoDetectWorkspace": true
 }
 ```
 
@@ -170,6 +188,29 @@ srcPaths:
 threshold: 8
 ignore:
   - "@internal/*"
+fileCountThreshold: 3
+autoDetectWorkspace: true
+```
+
+### Configuration Options
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `srcPaths` | string[] | `["./src"]` | Source directories to scan |
+| `threshold` | number | `5` | Symbol count threshold for RECODE verdict |
+| `includeDev` | boolean | `false` | Include devDependencies |
+| `ignore` | string[] | `[]` | Packages to ignore (supports globs) |
+| `format` | string | `"console"` | Output format: console, markdown, json |
+| `verbose` | boolean | `false` | Verbose output |
+| `fileCountThreshold` | number | `3` | Minimum file count to auto-KEEP (skip INVESTIGATE) |
+| `autoDetectWorkspace` | boolean | `true` | Auto-detect monorepo workspaces |
+
+### Default Ignore Patterns
+
+The following directories are always excluded from scanning:
+
+```
+node_modules, dist, .next, coverage
 ```
 
 **TypeScript** (`depscope.config.ts`):
@@ -302,14 +343,14 @@ Arrays (`ignore`, `wellKnownPatterns`) are **merged**, not replaced.
 
 ### INVESTIGATE Reasons
 
-When a package gets the INVESTIGATE verdict, dep-scope now shows **why**:
+When a package gets the INVESTIGATE verdict, dep-scope shows **why**:
 
-| Reason | Meaning |
-|--------|---------|
-| `[single file usage]` | Used in only 1 file |
-| `[low file spread]` | Used in 2-3 files (below threshold) |
-| `[low symbol count]` | Only 1-2 symbols used |
-| `[needs review]` | Unknown package, manual review needed |
+| Reason | Threshold | Meaning |
+|--------|-----------|---------|
+| `LOW_SYMBOL_COUNT` | <= 2 symbols | Only 1-2 symbols used |
+| `SINGLE_FILE_USAGE` | exactly 1 file | Used in only 1 file |
+| `LOW_FILE_SPREAD` | 2 to `fileCountThreshold` files | Used in 2-3 files (below threshold) |
+| `UNKNOWN_PACKAGE` | - | No well-known patterns matched, needs manual review |
 
 **Example output:**
 ```
@@ -473,15 +514,29 @@ dep-scope uses exit codes for CI pipelines:
 | Exit Code | Meaning |
 |-----------|---------|
 | `0` | Success, no actionable issues |
-| `1` | Success, but issues found (REMOVE, RECODE_NATIVE, duplicates) |
+| `1` | Success, but actionable issues found |
 | `2` | Error (invalid config, missing package.json, etc.) |
 
+### What counts as actionable
+
+The following verdicts trigger exit code 1:
+
+- **REMOVE** > 0 (unused dependencies)
+- **RECODE_NATIVE** > 0 (dependencies with native alternatives)
+- **PEER_DEP** > 0 (redundant peer dependencies)
+- **Duplicates found** (multiple libraries in same category)
+
+Note: **INVESTIGATE** is NOT considered actionable and will not trigger exit code 1.
+
 ```bash
-# In CI: fail if issues found
+# In CI: fail if actionable issues found
 dep-scope scan
 
 # In CI: always succeed (for reporting only)
 dep-scope scan --no-exit-code
+
+# Show only actionable items (hide INVESTIGATE)
+dep-scope scan --actionable-only
 ```
 
 ## Limitations
