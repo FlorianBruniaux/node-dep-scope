@@ -42,26 +42,40 @@ const VERDICT_SYMBOL: Record<Verdict, string> = {
   INVESTIGATE: "?",
 };
 
+export interface ReporterOptions {
+  actionableOnly?: boolean;
+}
+
 export class ConsoleReporter {
   /**
    * Print scan summary
    */
-  printScanSummary(result: ScanResult): void {
+  printScanSummary(result: ScanResult, options: ReporterOptions = {}): void {
+    const { actionableOnly } = options;
+
     console.log("");
     console.log(pc.bold("═══════════════════════════════════════════"));
     console.log(pc.bold("  dep-scope Analysis Report"));
+    if (actionableOnly) {
+      console.log(pc.dim("  (actionable items only)"));
+    }
     console.log(pc.bold("═══════════════════════════════════════════"));
     console.log("");
 
     // Summary counts
     console.log(pc.bold("Summary:"));
-    console.log(`  Total dependencies: ${pc.bold(String(result.summary.total))}`);
+    const displayedTotal = actionableOnly
+      ? result.summary.total - result.summary.investigate
+      : result.summary.total;
+    console.log(`  Total dependencies: ${pc.bold(String(displayedTotal))}`);
     console.log(`  ${pc.green("✓")} Keep:          ${result.summary.keep}`);
     console.log(`  ${pc.yellow("↻")} Recode Native: ${result.summary.recodeNative}`);
     console.log(`  ${pc.cyan("⇄")} Consolidate:   ${result.summary.consolidate}`);
     console.log(`  ${pc.red("✗")} Remove:        ${result.summary.remove}`);
     console.log(`  ${pc.blue("⊕")} Peer Dep:      ${result.summary.peerDep}`);
-    console.log(`  ${pc.magenta("?")} Investigate:   ${result.summary.investigate}`);
+    if (!actionableOnly) {
+      console.log(`  ${pc.magenta("?")} Investigate:   ${result.summary.investigate}`);
+    }
     console.log("");
 
     // Estimated savings
@@ -108,10 +122,22 @@ export class ConsoleReporter {
   /**
    * Print action items
    */
-  printActionItems(dependencies: DependencyAnalysis[]): void {
-    const actionItems = dependencies.filter((d) => d.verdict !== "KEEP");
+  printActionItems(dependencies: DependencyAnalysis[], options: ReporterOptions = {}): void {
+    const { actionableOnly } = options;
+
+    // Filter out KEEP, and optionally INVESTIGATE
+    const actionItems = dependencies.filter((d) => {
+      if (d.verdict === "KEEP") return false;
+      if (actionableOnly && d.verdict === "INVESTIGATE") return false;
+      return true;
+    });
+
     if (actionItems.length === 0) {
-      console.log(pc.green("No action items - all dependencies are well-used!"));
+      if (actionableOnly) {
+        console.log(pc.green("No actionable items found."));
+      } else {
+        console.log(pc.green("No action items - all dependencies are well-used!"));
+      }
       console.log("");
       return;
     }
@@ -159,19 +185,21 @@ export class ConsoleReporter {
       console.log("");
     }
 
-    // Investigate
-    const toInvestigate = actionItems.filter((d) => d.verdict === "INVESTIGATE");
-    if (toInvestigate.length > 0) {
-      console.log(`  ${pc.magenta("Investigate:")}`);
-      for (const dep of toInvestigate) {
-        const reason = dep.investigateReason
-          ? pc.dim(` [${formatInvestigateReason(dep.investigateReason)}]`)
-          : "";
-        console.log(
-          `    ${pc.magenta("?")} ${dep.name} (${formatCount(dep.totalSymbolsUsed, "symbol")} in ${formatCount(dep.fileCount, "file")})${reason}`
-        );
+    // Investigate (skip if actionableOnly)
+    if (!actionableOnly) {
+      const toInvestigate = actionItems.filter((d) => d.verdict === "INVESTIGATE");
+      if (toInvestigate.length > 0) {
+        console.log(`  ${pc.magenta("Investigate:")}`);
+        for (const dep of toInvestigate) {
+          const reason = dep.investigateReason
+            ? pc.dim(` [${formatInvestigateReason(dep.investigateReason)}]`)
+            : "";
+          console.log(
+            `    ${pc.magenta("?")} ${dep.name} (${formatCount(dep.totalSymbolsUsed, "symbol")} in ${formatCount(dep.fileCount, "file")})${reason}`
+          );
+        }
+        console.log("");
       }
-      console.log("");
     }
   }
 

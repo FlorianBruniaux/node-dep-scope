@@ -37,14 +37,23 @@ const VERDICT_LABEL: Record<Verdict, string> = {
   INVESTIGATE: "Investigate",
 };
 
+export interface ReporterOptions {
+  actionableOnly?: boolean;
+}
+
 export class MarkdownReporter {
   /**
    * Generate a full scan report
    */
-  generateScanReport(result: ScanResult): string {
+  generateScanReport(result: ScanResult, options: ReporterOptions = {}): string {
+    const { actionableOnly } = options;
     const lines: string[] = [];
 
     lines.push(`# Dependency Analysis Report`);
+    if (actionableOnly) {
+      lines.push("");
+      lines.push(`> **Actionable items only** - INVESTIGATE verdicts are hidden`);
+    }
     lines.push("");
     lines.push(`Generated: ${result.scannedAt}`);
     lines.push(`Project: ${result.projectPath}`);
@@ -55,13 +64,18 @@ export class MarkdownReporter {
     lines.push("");
     lines.push("| Category | Count |");
     lines.push("|----------|-------|");
-    lines.push(`| Total Dependencies | ${result.summary.total} |`);
+    const displayedTotal = actionableOnly
+      ? result.summary.total - result.summary.investigate
+      : result.summary.total;
+    lines.push(`| Total Dependencies | ${displayedTotal} |`);
     lines.push(`| ✅ Keep | ${result.summary.keep} |`);
     lines.push(`| 🔄 Recode Native | ${result.summary.recodeNative} |`);
     lines.push(`| 🔀 Consolidate | ${result.summary.consolidate} |`);
     lines.push(`| 🗑️ Remove | ${result.summary.remove} |`);
     lines.push(`| 🔗 Peer Dep | ${result.summary.peerDep} |`);
-    lines.push(`| 🔍 Investigate | ${result.summary.investigate} |`);
+    if (!actionableOnly) {
+      lines.push(`| 🔍 Investigate | ${result.summary.investigate} |`);
+    }
     lines.push("");
 
     // Estimated Savings
@@ -82,10 +96,12 @@ export class MarkdownReporter {
       }
     }
 
-    // Action Items
-    const actionItems = result.dependencies.filter(
-      (d) => d.verdict !== "KEEP"
-    );
+    // Action Items - filter out INVESTIGATE if actionableOnly
+    const actionItems = result.dependencies.filter((d) => {
+      if (d.verdict === "KEEP") return false;
+      if (actionableOnly && d.verdict === "INVESTIGATE") return false;
+      return true;
+    });
 
     if (actionItems.length > 0) {
       lines.push("## Action Items");
@@ -128,28 +144,34 @@ export class MarkdownReporter {
         lines.push("");
       }
 
-      // Investigate
-      const toInvestigate = actionItems.filter((d) => d.verdict === "INVESTIGATE");
-      if (toInvestigate.length > 0) {
-        lines.push("### 🔍 Investigate");
-        lines.push("");
-        for (const dep of toInvestigate) {
-          const reasonLabel = dep.investigateReason
-            ? ` *(${INVESTIGATE_REASON_LABELS[dep.investigateReason]})*`
-            : "";
-          lines.push(`- \`${dep.name}\` - ${formatCount(dep.totalSymbolsUsed, "symbol")} in ${formatCount(dep.fileCount, "file")}${reasonLabel}`);
+      // Investigate (skip if actionableOnly)
+      if (!actionableOnly) {
+        const toInvestigate = actionItems.filter((d) => d.verdict === "INVESTIGATE");
+        if (toInvestigate.length > 0) {
+          lines.push("### 🔍 Investigate");
+          lines.push("");
+          for (const dep of toInvestigate) {
+            const reasonLabel = dep.investigateReason
+              ? ` *(${INVESTIGATE_REASON_LABELS[dep.investigateReason]})*`
+              : "";
+            lines.push(`- \`${dep.name}\` - ${formatCount(dep.totalSymbolsUsed, "symbol")} in ${formatCount(dep.fileCount, "file")}${reasonLabel}`);
+          }
+          lines.push("");
         }
-        lines.push("");
       }
     }
 
-    // Full Analysis Table
+    // Full Analysis Table - filter INVESTIGATE if actionableOnly
+    const displayedDeps = actionableOnly
+      ? result.dependencies.filter((d) => d.verdict !== "INVESTIGATE")
+      : result.dependencies;
+
     lines.push("## Full Analysis");
     lines.push("");
     lines.push("| Package | Version | Symbols | Files | Import Style | Verdict |");
     lines.push("|---------|---------|---------|-------|--------------|---------|");
 
-    for (const dep of result.dependencies) {
+    for (const dep of displayedDeps) {
       const emoji = VERDICT_EMOJI[dep.verdict];
       const label = VERDICT_LABEL[dep.verdict];
       lines.push(

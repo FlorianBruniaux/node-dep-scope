@@ -129,6 +129,7 @@ program
   .option("-v, --verbose", "Verbose output")
   .option("--ignore <packages...>", "Packages to ignore")
   .option("--with-knip", "Use Knip for pre-analysis (improved accuracy)")
+  .option("--actionable-only", "Show only actionable items (hide INVESTIGATE)")
   .option("--no-config", "Ignore config file")
   .option("--no-exit-code", "Always exit with code 0 (for CI debugging)")
   .option("--no-auto-detect", "Disable monorepo workspace auto-detection")
@@ -219,7 +220,7 @@ program
       };
 
       // Output
-      await outputResult(result, format, output, "scan");
+      await outputResult(result, format, output, "scan", options.actionableOnly);
 
       // Exit with appropriate code for CI
       if (options.exitCode !== false && hasActionableIssues(result)) {
@@ -539,11 +540,12 @@ async function outputResult(
   result: ScanResult,
   format: Format,
   output: string | undefined,
-  type: "scan" | "duplicates"
+  type: "scan" | "duplicates",
+  actionableOnly?: boolean
 ): Promise<void> {
   switch (format) {
     case "markdown":
-      const md = markdownReporter.generateScanReport(result);
+      const md = markdownReporter.generateScanReport(result, { actionableOnly });
       if (output) {
         await fs.writeFile(output, md);
         console.log(`Report saved to ${output}`);
@@ -553,7 +555,18 @@ async function outputResult(
       break;
 
     case "json":
-      const json = JSON.stringify(result, null, 2);
+      // Filter INVESTIGATE from JSON output if actionableOnly
+      const jsonResult = actionableOnly
+        ? {
+            ...result,
+            dependencies: result.dependencies.filter((d) => d.verdict !== "INVESTIGATE"),
+            summary: {
+              ...result.summary,
+              investigate: 0,
+            },
+          }
+        : result;
+      const json = JSON.stringify(jsonResult, null, 2);
       if (output) {
         await fs.writeFile(output, json);
         console.log(`Report saved to ${output}`);
@@ -564,9 +577,9 @@ async function outputResult(
 
     case "console":
     default:
-      consoleReporter.printScanSummary(result);
+      consoleReporter.printScanSummary(result, { actionableOnly });
       consoleReporter.printDuplicates(result.duplicates);
-      consoleReporter.printActionItems(result.dependencies);
+      consoleReporter.printActionItems(result.dependencies, { actionableOnly });
       break;
   }
 }
