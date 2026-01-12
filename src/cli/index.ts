@@ -19,6 +19,7 @@ import {
   InvalidOptionError,
   ProjectNotFoundError,
 } from "../errors/index.js";
+import { isKnipAvailable } from "../integrations/knip.js";
 import type { ScanResult, Verdict } from "../types/index.js";
 
 const VERSION = "0.1.0";
@@ -129,7 +130,8 @@ program
   .option("-o, --output <file>", "Output file path")
   .option("-v, --verbose", "Verbose output")
   .option("--ignore <packages...>", "Packages to ignore")
-  .option("--with-knip", "Use Knip for pre-analysis (improved accuracy)")
+  .option("--with-knip", "Use Knip for pre-analysis (auto-detected by default)")
+  .option("--no-knip", "Disable Knip integration even if available")
   .option("--actionable-only", "Show only actionable items (hide INVESTIGATE)")
   .option("--check-duplicates", "Check for duplicate libraries (off by default)")
   .option("--no-config", "Ignore config file")
@@ -151,11 +153,26 @@ program
         ...(options.verbose !== undefined && { verbose: options.verbose }),
         ...(options.format && { format: validateFormat(options.format) }),
         ...(options.output && { output: options.output }),
-        ...(options.withKnip !== undefined && { withKnip: options.withKnip }),
       };
 
       // Resolve config with presets and defaults
       const config = resolveConfig(cliOptions, fileConfig);
+
+      // Knip auto-detection logic:
+      // - --no-knip explicitly disables
+      // - --with-knip explicitly enables
+      // - Default: auto-detect if Knip is available in project
+      let withKnip: boolean;
+      if (options.knip === false) {
+        // --no-knip used
+        withKnip = false;
+      } else if (options.withKnip === true) {
+        // --with-knip explicitly used
+        withKnip = true;
+      } else {
+        // Auto-detect: use Knip if available
+        withKnip = isKnipAvailable(projectPath);
+      }
 
       // autoDetect is false when --no-auto-detect is used
       const autoDetectWorkspace = options.autoDetect !== false;
@@ -167,7 +184,7 @@ program
         includeDev: config.includeDev,
         ignore: config.ignore,
         verbose: config.verbose,
-        withKnip: config.withKnip,
+        withKnip,
         autoDetectWorkspace,
         wellKnownPatterns: config.wellKnownPatterns,
       });
@@ -180,8 +197,13 @@ program
         if (fileConfig) {
           console.log("Using config file.");
         }
-        if (config.withKnip) {
-          console.log("Knip integration enabled.");
+        if (withKnip) {
+          const knipMode = options.withKnip === true
+            ? "(explicit)"
+            : "(auto-detected)";
+          console.log(`Knip integration enabled ${knipMode}.`);
+        } else if (options.knip === false) {
+          console.log("Knip integration disabled (--no-knip).");
         }
         if (options.checkDuplicates) {
           console.log("Duplicate detection enabled.");
