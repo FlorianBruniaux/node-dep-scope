@@ -5,19 +5,65 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org/)
 
-Analyze **granular** dependency usage in TypeScript/JavaScript projects.
+**Symbol-level dependency analysis** for TypeScript/JavaScript projects.
 
-## Why?
+> *"Knip tells you what's unused. dep-scope tells you how you use what you keep."*
 
-Existing tools like [Knip](https://github.com/webpro/knip) and [Depcheck](https://github.com/depcheck/depcheck) tell you if a dependency is used or not. **dep-scope** goes deeper:
+## When to use dep-scope
+
+**Good use cases:**
+- **Legacy project audit**: Finding lodash functions that now have native equivalents
+- **Library consolidation**: Do we really need 3 icon libraries?
+- **Curiosity**: "Which symbols from this 50KB library do we actually use?"
+
+**Not the right tool if:**
+- You just want unused deps → use [Knip](https://knip.dev) instead
+- Your codebase is already well-maintained → dep-scope will mostly say "KEEP"
+
+## Quick Example
+
+```bash
+$ dep-scope scan
+
+═══════════════════════════════════════════
+  dep-scope Analysis Report
+═══════════════════════════════════════════
+
+Summary:
+  Total dependencies: 45
+  ✓ Keep:          38
+  ↻ Recode Native: 1
+  ✗ Remove:        2
+  ⊕ Peer Dep:      4
+
+Action Items:
+  Remove (unused):
+    ✗ lodash.isequal
+    ✗ moment
+
+  Recode to native:
+    ↻ lodash.debounce (1 symbol) → native setTimeout pattern
+
+  Peer deps (redundant in package.json):
+    ⊕ react ← required by: react-dom, @tanstack/react-query
+```
+
+**What it found:**
+- 2 unused packages to remove
+- 1 lodash function replaceable with native code
+- 4 peer deps that don't need explicit installation
+
+## How it compares
 
 | Feature | Knip | Depcheck | dep-scope |
 |---------|------|----------|-----------|
+| Unused detection | ✅ Excellent | ✅ Good | ⚠️ Basic |
+| Config file scanning | ✅ | ✅ | ❌ |
 | Symbol-level analysis | ❌ | ❌ | ✅ |
-| Usage count & locations | ❌ | ❌ | ✅ |
-| Native JS alternatives | ❌ | ❌ | ✅ |
+| Native alternatives | ❌ | ❌ | ✅ |
 | Duplicate detection | ❌ | ❌ | ✅ |
-| Peer dependency detection | ❌ | ❌ | ✅ |
+
+**Recommendation**: Use Knip for unused detection, dep-scope for deeper analysis. They work well together (dep-scope auto-detects Knip if installed).
 
 ## Installation
 
