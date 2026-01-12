@@ -167,6 +167,37 @@ export const DEFAULT_WELL_KNOWN_PATTERNS: WellKnownPattern[] = [
   { pattern: "file-type", verdict: "KEEP", reason: "File detection" },
   { pattern: "bcrypt*", verdict: "KEEP", reason: "Password hashing" },
   { pattern: "argon2", verdict: "KEEP", reason: "Password hashing" },
+
+  // CSS animation libraries (import via @import, not detected)
+  { pattern: "tw-animate-css", verdict: "KEEP", reason: "CSS animations (@import)" },
+  { pattern: "animate.css", verdict: "KEEP", reason: "CSS animations (@import)" },
+
+  // Video/WebRTC SDKs (often used via iframe/REST, not direct imports)
+  { pattern: "@daily-co/*", verdict: "KEEP", reason: "Video SDK (iframe/REST API)" },
+  { pattern: "@livekit/*", verdict: "KEEP", reason: "Video SDK" },
+  { pattern: "@100mslive/*", verdict: "KEEP", reason: "Video SDK" },
+  { pattern: "twilio-video", verdict: "KEEP", reason: "Video SDK" },
+  { pattern: "agora-rtc-sdk*", verdict: "KEEP", reason: "Video SDK" },
+
+  // Analytics (singleton pattern - low file spread is normal)
+  { pattern: "@hotjar/*", verdict: "KEEP", reason: "Analytics (singleton)" },
+  { pattern: "@segment/*", verdict: "KEEP", reason: "Analytics (singleton)" },
+  { pattern: "@sentry/*", verdict: "KEEP", reason: "Error tracking (singleton)" },
+  { pattern: "posthog-js", verdict: "KEEP", reason: "Analytics (singleton)" },
+  { pattern: "mixpanel-browser", verdict: "KEEP", reason: "Analytics (singleton)" },
+  { pattern: "@amplitude/*", verdict: "KEEP", reason: "Analytics (singleton)" },
+
+  // ProseMirror ecosystem (editor dependencies)
+  { pattern: "orderedmap", verdict: "KEEP", reason: "ProseMirror dependency" },
+
+  // React UI utilities (single component usage is normal)
+  { pattern: "react-inlinesvg", verdict: "KEEP", reason: "SVG rendering component" },
+  { pattern: "react-top-loading-bar", verdict: "KEEP", reason: "Navigation progress" },
+  { pattern: "nprogress", verdict: "KEEP", reason: "Progress bar" },
+
+  // Streaming utilities
+  { pattern: "resumable-stream", verdict: "KEEP", reason: "Stream utilities" },
+  { pattern: "eventsource-parser", verdict: "KEEP", reason: "SSE parsing" },
 ];
 
 /**
