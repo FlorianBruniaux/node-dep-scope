@@ -19,8 +19,43 @@ export const DEFAULT_WELL_KNOWN_PATTERNS: WellKnownPattern[] = [
   { pattern: "tsup", verdict: "IGNORE", reason: "Build tool" },
   { pattern: "esbuild", verdict: "IGNORE", reason: "Build tool" },
   { pattern: "rollup", verdict: "IGNORE", reason: "Build tool" },
+  { pattern: "rollup-*", verdict: "IGNORE", reason: "Rollup plugin" },
   { pattern: "vite", verdict: "IGNORE", reason: "Build tool" },
+  { pattern: "vite-*", verdict: "IGNORE", reason: "Vite plugin" },
+  { pattern: "@vitejs/*", verdict: "IGNORE", reason: "Vite ecosystem" },
   { pattern: "webpack", verdict: "IGNORE", reason: "Build tool" },
+  { pattern: "webpack-*", verdict: "IGNORE", reason: "Webpack plugin" },
+  { pattern: "@swc/*", verdict: "IGNORE", reason: "SWC compiler" },
+  { pattern: "swc", verdict: "IGNORE", reason: "SWC compiler" },
+  { pattern: "@babel/*", verdict: "IGNORE", reason: "Babel compiler" },
+  { pattern: "babel-*", verdict: "IGNORE", reason: "Babel plugin" },
+  { pattern: "turbo", verdict: "IGNORE", reason: "Monorepo tool" },
+  { pattern: "lerna", verdict: "IGNORE", reason: "Monorepo tool" },
+  { pattern: "nx", verdict: "IGNORE", reason: "Monorepo tool" },
+  { pattern: "@nx/*", verdict: "IGNORE", reason: "Nx ecosystem" },
+
+  // CSS/PostCSS tooling - config only
+  { pattern: "tailwindcss", verdict: "IGNORE", reason: "CSS framework (config only)" },
+  { pattern: "@tailwindcss/*", verdict: "IGNORE", reason: "Tailwind ecosystem" },
+  { pattern: "postcss", verdict: "IGNORE", reason: "CSS processor (config only)" },
+  { pattern: "postcss-*", verdict: "IGNORE", reason: "PostCSS plugin" },
+  { pattern: "autoprefixer", verdict: "IGNORE", reason: "PostCSS plugin" },
+  { pattern: "cssnano", verdict: "IGNORE", reason: "CSS minifier" },
+  { pattern: "sass", verdict: "IGNORE", reason: "CSS preprocessor" },
+  { pattern: "less", verdict: "IGNORE", reason: "CSS preprocessor" },
+  { pattern: "stylus", verdict: "IGNORE", reason: "CSS preprocessor" },
+
+  // Git hooks and commit tooling - dev only
+  { pattern: "husky", verdict: "IGNORE", reason: "Git hooks" },
+  { pattern: "lint-staged", verdict: "IGNORE", reason: "Git hooks" },
+  { pattern: "commitlint", verdict: "IGNORE", reason: "Commit linting" },
+  { pattern: "@commitlint/*", verdict: "IGNORE", reason: "Commitlint ecosystem" },
+  { pattern: "semantic-release", verdict: "IGNORE", reason: "Release automation" },
+  { pattern: "@semantic-release/*", verdict: "IGNORE", reason: "Semantic release plugins" },
+  { pattern: "release-it", verdict: "IGNORE", reason: "Release automation" },
+  { pattern: "standard-version", verdict: "IGNORE", reason: "Release automation" },
+  { pattern: "changeset", verdict: "IGNORE", reason: "Changeset tool" },
+  { pattern: "@changesets/*", verdict: "IGNORE", reason: "Changesets ecosystem" },
 
   // Linters and formatters - config only
   { pattern: "eslint", verdict: "IGNORE", reason: "Linter" },
@@ -72,6 +107,66 @@ export const DEFAULT_WELL_KNOWN_PATTERNS: WellKnownPattern[] = [
   // Config loaders - naturally low spread
   { pattern: "dotenv", verdict: "KEEP", reason: "Environment config" },
   { pattern: "dotenv-*", verdict: "KEEP", reason: "dotenv ecosystem" },
+
+  // AI SDK - single provider file is normal
+  { pattern: "@ai-sdk/*", verdict: "KEEP", reason: "AI SDK (single provider file)" },
+  { pattern: "ai", verdict: "KEEP", reason: "Vercel AI SDK" },
+  { pattern: "openai", verdict: "KEEP", reason: "OpenAI SDK" },
+
+  // Auth - single provider/middleware is normal
+  { pattern: "@clerk/*", verdict: "KEEP", reason: "Clerk auth (provider pattern)" },
+  { pattern: "@auth/*", verdict: "KEEP", reason: "Auth.js ecosystem" },
+  { pattern: "lucia", verdict: "KEEP", reason: "Lucia auth" },
+
+  // Editor libraries - single editor component is normal
+  { pattern: "@codemirror/*", verdict: "KEEP", reason: "CodeMirror (editor component)" },
+  { pattern: "codemirror", verdict: "KEEP", reason: "CodeMirror" },
+  { pattern: "prosemirror-*", verdict: "KEEP", reason: "ProseMirror (editor component)" },
+  { pattern: "@tiptap/*", verdict: "KEEP", reason: "TipTap editor" },
+  { pattern: "monaco-editor", verdict: "KEEP", reason: "Monaco editor" },
+  { pattern: "@monaco-editor/*", verdict: "KEEP", reason: "Monaco editor" },
+
+  // Vercel/Next.js ecosystem - single usage is normal
+  { pattern: "@vercel/*", verdict: "KEEP", reason: "Vercel SDK" },
+  { pattern: "@t3-oss/*", verdict: "KEEP", reason: "T3 ecosystem" },
+  { pattern: "next-themes", verdict: "KEEP", reason: "Theme provider" },
+
+  // Database/Cache - single connection file is normal
+  { pattern: "redis", verdict: "KEEP", reason: "Redis client (single connection)" },
+  { pattern: "ioredis", verdict: "KEEP", reason: "Redis client" },
+  { pattern: "pg", verdict: "KEEP", reason: "PostgreSQL client" },
+  { pattern: "mysql2", verdict: "KEEP", reason: "MySQL client" },
+  { pattern: "mongodb", verdict: "KEEP", reason: "MongoDB client" },
+  { pattern: "mongoose", verdict: "KEEP", reason: "MongoDB ODM" },
+  { pattern: "pgvector", verdict: "KEEP", reason: "Postgres vector" },
+
+  // UI primitives - single component usage is normal
+  { pattern: "cmdk", verdict: "KEEP", reason: "Command menu (single component)" },
+  { pattern: "vaul", verdict: "KEEP", reason: "Drawer component" },
+  { pattern: "sonner", verdict: "KEEP", reason: "Toast component" },
+  { pattern: "input-otp", verdict: "KEEP", reason: "OTP input component" },
+  { pattern: "@uiw/*", verdict: "KEEP", reason: "UIW components" },
+
+  // Math/Rendering - specialized single-use
+  { pattern: "katex", verdict: "KEEP", reason: "Math rendering" },
+  { pattern: "mathlive", verdict: "KEEP", reason: "Math editor" },
+  { pattern: "rehype-*", verdict: "KEEP", reason: "Rehype plugin" },
+  { pattern: "remark-*", verdict: "KEEP", reason: "Remark plugin" },
+
+  // Background jobs/Cron - single setup file
+  { pattern: "node-cron", verdict: "KEEP", reason: "Cron scheduler" },
+  { pattern: "bullmq", verdict: "KEEP", reason: "Job queue" },
+  { pattern: "agenda", verdict: "KEEP", reason: "Job scheduler" },
+
+  // Misc specialized libraries
+  { pattern: "dataloader", verdict: "KEEP", reason: "Data batching (single setup)" },
+  { pattern: "svix", verdict: "KEEP", reason: "Webhook service" },
+  { pattern: "papaparse", verdict: "KEEP", reason: "CSV parser" },
+  { pattern: "diff-match-patch", verdict: "KEEP", reason: "Diff utility" },
+  { pattern: "gpt-tokenizer", verdict: "KEEP", reason: "Token counter" },
+  { pattern: "file-type", verdict: "KEEP", reason: "File detection" },
+  { pattern: "bcrypt*", verdict: "KEEP", reason: "Password hashing" },
+  { pattern: "argon2", verdict: "KEEP", reason: "Password hashing" },
 ];
 
 /**

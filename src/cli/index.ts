@@ -93,14 +93,15 @@ function handleError(error: unknown): never {
 
 /**
  * Determine if there are actionable issues in the scan result
+ * Note: duplicates only count if --check-duplicates was used
  */
-function hasActionableIssues(result: ScanResult): boolean {
-  // Issues = REMOVE, RECODE_NATIVE, or duplicates
+function hasActionableIssues(result: ScanResult, checkDuplicates: boolean): boolean {
+  // Issues = REMOVE, RECODE_NATIVE, PEER_DEP, or duplicates (if checked)
   return (
     result.summary.remove > 0 ||
     result.summary.recodeNative > 0 ||
     result.summary.peerDep > 0 ||
-    result.duplicates.length > 0
+    (checkDuplicates && result.duplicates.length > 0)
   );
 }
 
@@ -130,6 +131,7 @@ program
   .option("--ignore <packages...>", "Packages to ignore")
   .option("--with-knip", "Use Knip for pre-analysis (improved accuracy)")
   .option("--actionable-only", "Show only actionable items (hide INVESTIGATE)")
+  .option("--check-duplicates", "Check for duplicate libraries (off by default)")
   .option("--no-config", "Ignore config file")
   .option("--no-exit-code", "Always exit with code 0 (for CI debugging)")
   .option("--no-auto-detect", "Disable monorepo workspace auto-detection")
@@ -181,10 +183,14 @@ program
         if (config.withKnip) {
           console.log("Knip integration enabled.");
         }
+        if (options.checkDuplicates) {
+          console.log("Duplicate detection enabled.");
+        }
       }
 
       const dependencies = await analyzer.scanProject(projectPath);
-      const duplicates = detectDuplicates(dependencies);
+      // Duplicate detection is opt-in (use --check-duplicates or `dep-scope duplicates`)
+      const duplicates = options.checkDuplicates ? detectDuplicates(dependencies) : [];
 
       // Calculate summary
       const summary = {
@@ -223,7 +229,7 @@ program
       await outputResult(result, format, output, "scan", options.actionableOnly);
 
       // Exit with appropriate code for CI
-      if (options.exitCode !== false && hasActionableIssues(result)) {
+      if (options.exitCode !== false && hasActionableIssues(result, !!options.checkDuplicates)) {
         process.exit(EXIT_ISSUES_FOUND);
       }
     } catch (error) {
