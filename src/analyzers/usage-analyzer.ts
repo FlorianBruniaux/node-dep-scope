@@ -28,6 +28,7 @@ import { runKnipAnalysis, formatKnipSummary } from "../integrations/knip.js";
 import { detectWorkspace } from "../utils/workspace-detector.js";
 import { shouldIgnoreWellKnown } from "../rules/well-known-packages.js";
 import { DEFAULT_WELL_KNOWN_PATTERNS } from "../config/defaults.js";
+import { createPathAliasChecker } from "../utils/path-alias-detector.js";
 import { PackageJsonReader, packageJsonReader as defaultPackageJsonReader } from "../utils/package-json-reader.js";
 import { SourceFileScanner, sourceFileScanner as defaultSourceFileScanner } from "../utils/source-file-scanner.js";
 import { ImportAggregator, importAggregator as defaultImportAggregator } from "../utils/import-aggregator.js";
@@ -49,6 +50,7 @@ export interface UsageAnalyzerDependencies {
 export class UsageAnalyzer {
   private options: AnalyzerOptions;
   private knipAnalysis: KnipPreAnalysis | null = null;
+  private isPathAlias: ((importPath: string) => boolean) | null = null;
 
   // Injected dependencies
   private readonly logger: ILogger;
@@ -90,6 +92,9 @@ export class UsageAnalyzer {
    * Scan a project and analyze all dependencies
    */
   async scanProject(projectPath: string): Promise<DependencyAnalysis[]> {
+    // Initialize path alias checker for this project
+    this.isPathAlias = createPathAliasChecker(projectPath);
+
     // Run Knip pre-analysis if enabled
     if (this.options.withKnip) {
       await this.runKnipPreAnalysis(projectPath);
@@ -178,6 +183,9 @@ export class UsageAnalyzer {
     projectPath: string,
     packageName: string
   ): Promise<DependencyAnalysis> {
+    // Initialize path alias checker for this project
+    this.isPathAlias = createPathAliasChecker(projectPath);
+
     const packageJson = await this.packageJsonReader.read(projectPath);
 
     const version =
@@ -205,7 +213,10 @@ export class UsageAnalyzer {
     for (const file of sourceFiles) {
       try {
         const imports = await this.importAnalyzer.analyzeFile(file);
-        const packageImports = imports.filter((i) => i.packageName === packageName);
+        // Filter out path aliases and keep only imports from the target package
+        const packageImports = imports.filter(
+          (i) => i.packageName === packageName && !this.isPathAlias?.(i.importPath)
+        );
         allImports.push(...packageImports);
       } catch {
         // Skip files that fail to parse
@@ -279,17 +290,31 @@ export class UsageAnalyzer {
 
   /**
    * Collect imports from all source files
+   * Filters out path aliases (e.g., @/components) which are internal, not npm packages
    */
   private async collectImports(sourceFiles: string[]): Promise<ImportInfo[]> {
     const allImports: ImportInfo[] = [];
+    let filteredPathAliases = 0;
 
     for (const file of sourceFiles) {
       try {
         const imports = await this.importAnalyzer.analyzeFile(file);
-        allImports.push(...imports);
+
+        // Filter out path aliases (internal project imports, not npm packages)
+        for (const imp of imports) {
+          if (this.isPathAlias?.(imp.importPath)) {
+            filteredPathAliases++;
+            continue;
+          }
+          allImports.push(imp);
+        }
       } catch (error) {
         this.logger.debug(`Warning: Could not analyze ${file}`);
       }
+    }
+
+    if (filteredPathAliases > 0) {
+      this.logger.debug(`Filtered ${filteredPathAliases} path alias imports (e.g., @/components)`);
     }
 
     return allImports;
