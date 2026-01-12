@@ -42,6 +42,8 @@ src/
 ├── reporters/
 │   ├── console-reporter.ts     # Terminal output with picocolors
 │   └── markdown-reporter.ts    # Markdown report generation
+├── utils/
+│   └── path-alias-detector.ts  # Filters @/, ~/, tsconfig paths from analysis
 ├── cli/index.ts                # Commander.js CLI entry point
 └── index.ts                    # Public API exports
 ```
@@ -139,19 +141,30 @@ Add entries to `DEFAULT_WELL_KNOWN_PATTERNS` array:
 
 Patterns support glob syntax (`*` wildcards). Users can also add patterns via config file.
 
+## Path Alias Filtering
+
+Path aliases are automatically filtered from import analysis:
+- Common patterns: `@/`, `~/`, `#/`, `@app/`, `@components/`, etc.
+- TSConfig paths: Custom aliases from `tsconfig.json` → `compilerOptions.paths`
+
+This prevents false positives where `@/components/Button` would be counted as an npm package.
+
 ## Known Limitations
 
 - **Not detected**: CSS imports (`@import 'pkg'`), config file references (tailwind plugins, babel configs)
 - **Not published**: Not yet on npm
+- **CONSOLIDATE opt-in**: Duplicate detection requires `--check-duplicates` flag
 
 Note: Dynamic imports (`await import('pkg')`) and `require()` calls ARE detected.
 
 ## Knip Integration
 
-dep-scope can optionally use Knip for pre-analysis:
+dep-scope automatically uses Knip when available in the project:
 
 ```bash
-dep-scope scan --with-knip    # Use Knip to improve accuracy
+dep-scope scan              # Auto-detects and uses Knip if installed
+dep-scope scan --with-knip  # Force enable Knip
+dep-scope scan --no-knip    # Disable Knip integration
 ```
 
 The integration runs Knip first, then uses its results to boost confidence scores.
@@ -174,4 +187,4 @@ Use `--no-exit-code` to always exit with 0.
 - zod for config validation
 - jiti for TypeScript config loading
 - yaml for YAML config support
-- Vitest for testing (159 tests)
+- Vitest for testing (309 tests)

@@ -77,7 +77,9 @@ Scans all dependencies and outputs a summary with verdicts.
 | `-o, --output <file>` | Output file path | stdout |
 | `-v, --verbose` | Verbose output | `false` |
 | `--ignore <packages...>` | Packages to ignore | none |
-| `--with-knip` | Use Knip for pre-analysis | `false` |
+| `--with-knip` | Use Knip for pre-analysis (auto-detected by default) | auto |
+| `--no-knip` | Disable Knip integration even if available | `false` |
+| `--check-duplicates` | Enable duplicate library detection | `false` |
 | `--actionable-only` | Show only actionable items (hide INVESTIGATE) | `false` |
 | `--no-config` | Ignore config file | `false` |
 | `--no-auto-detect` | Disable monorepo workspace auto-detection | `false` |
@@ -266,12 +268,14 @@ Automatically assign KEEP or IGNORE verdicts to packages matching patterns:
 }
 ```
 
-**Built-in patterns** (always applied):
+**Built-in patterns** (120+ patterns, always applied):
 - `@radix-ui/*`, `@headlessui/*`, `@chakra-ui/*` → KEEP (UI libraries)
 - `@tanstack/*`, `react-hook-form`, `zustand` → KEEP (React ecosystem)
 - `zod`, `valibot`, `yup` → KEEP (Validation)
 - `@prisma/client`, `drizzle-orm` → KEEP (ORMs)
 - `@types/*`, `eslint*`, `prettier`, `vitest`, `jest` → IGNORE (Dev tools)
+- `tailwindcss`, `postcss`, `autoprefixer` → IGNORE (CSS tooling)
+- `vite`, `webpack`, `esbuild`, `rollup` → IGNORE (Bundlers)
 
 ### Custom Native Alternatives
 
@@ -486,11 +490,17 @@ dep-scope suggests native replacements for common libraries:
 
 ## Knip Integration
 
-dep-scope can use [Knip](https://knip.dev) for improved accuracy:
+dep-scope automatically uses [Knip](https://knip.dev) when available in your project for improved accuracy:
 
 ```bash
-# Pre-analyze with Knip (recommended for large projects)
+# Knip is auto-detected and used by default
+dep-scope scan
+
+# Explicitly enable Knip
 dep-scope scan --with-knip
+
+# Disable Knip integration
+dep-scope scan --no-knip
 ```
 
 This runs Knip first to detect unused dependencies, then dep-scope adds symbol-level analysis. The combination reduces false positives significantly.
@@ -539,6 +549,16 @@ dep-scope scan --no-exit-code
 dep-scope scan --actionable-only
 ```
 
+## Path Alias Handling
+
+dep-scope automatically filters out path aliases to avoid counting internal imports as external packages:
+
+- **Common patterns**: `@/`, `~/`, `#/` prefixes
+- **Word-based aliases**: `@app/`, `@components/`, `@utils/`, etc.
+- **TSConfig paths**: Custom aliases from `tsconfig.json` → `compilerOptions.paths`
+
+This prevents false positives where `@/components/Button` would incorrectly be counted as an npm package.
+
 ## Limitations
 
 The analyzer uses static AST analysis. It won't detect:
@@ -547,7 +567,7 @@ The analyzer uses static AST analysis. It won't detect:
 - **Config references**: Tailwind plugins, Babel presets, etc.
 - **Runtime-only deps**: Dependencies used only at runtime without imports
 
-Use `--ignore` to exclude packages you know are used in config files, or use `--with-knip` for better detection.
+Use `--ignore` to exclude packages you know are used in config files. Knip integration (enabled by default) helps detect config-referenced packages.
 
 ## Claude Code Integration
 

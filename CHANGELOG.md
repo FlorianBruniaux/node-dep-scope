@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Knip Auto-Detection**: Knip is now automatically used when available in the project. Use `--no-knip` to disable.
+- **Path Alias Filtering**: Path aliases (`@/`, `~/`, tsconfig paths) are now automatically filtered from import analysis to avoid false positives.
+- **Detailed Symbol Locations**: `analyze` command now shows file:line locations for each symbol usage.
+- **`--check-duplicates` Flag**: Duplicate detection is now opt-in via `--check-duplicates` to reduce noise.
+- **Expanded wellKnownPatterns**: 120+ patterns covering bundlers, testing, linting, CSS/styling, and more config-only packages.
+
+### Changed
+
+- `--with-knip` is now the default behavior when Knip is installed in the project.
+- CONSOLIDATE verdict only appears when `--check-duplicates` is explicitly used.
+
 ## [0.1.0] - 2025-01-10
 
 ### Added
@@ -33,7 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Custom well-known patterns, native alternatives, and duplicate categories
 
 - **Well-Known Patterns**
-  - 75+ built-in patterns for automatic KEEP/IGNORE verdicts
+  - 120+ built-in patterns for automatic KEEP/IGNORE verdicts
   - UI libraries: @radix-ui/*, @headlessui/*, @chakra-ui/*, @mantine/*
   - React ecosystem: @tanstack/*, react-hook-form, zustand, jotai, swr
   - Validation: zod, valibot, yup
