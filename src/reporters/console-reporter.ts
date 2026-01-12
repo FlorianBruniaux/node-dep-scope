@@ -228,13 +228,25 @@ export class ConsoleReporter {
 
     if (analysis.symbolsUsed.length > 0) {
       console.log(pc.bold("Symbols Used:"));
-      for (const symbol of analysis.symbolsUsed.slice(0, 10)) {
+      for (const sym of analysis.symbolsUsed.slice(0, 10)) {
+        const uniqueFiles = new Set(sym.locations.map((l) => l.file));
         console.log(
-          `  ${pc.cyan(symbol.symbol.padEnd(20))} ${String(symbol.count).padStart(3)}x in ${new Set(symbol.locations.map((l) => l.file)).size} files`
+          `  ${pc.cyan(sym.symbol.padEnd(20))} ${String(sym.count).padStart(3)}x in ${uniqueFiles.size} files`
         );
+
+        // Show first 3 file locations with line numbers
+        const locationsToShow = sym.locations.slice(0, 3);
+        for (const loc of locationsToShow) {
+          // Show relative path and line number
+          const relativePath = loc.file.replace(process.cwd() + "/", "");
+          console.log(pc.dim(`      ${relativePath}:${loc.line}`));
+        }
+        if (sym.locations.length > 3) {
+          console.log(pc.dim(`      ... and ${sym.locations.length - 3} more locations`));
+        }
       }
       if (analysis.symbolsUsed.length > 10) {
-        console.log(pc.dim(`  ... and ${analysis.symbolsUsed.length - 10} more`));
+        console.log(pc.dim(`  ... and ${analysis.symbolsUsed.length - 10} more symbols`));
       }
       console.log("");
     }

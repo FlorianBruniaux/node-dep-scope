@@ -214,13 +214,33 @@ export class MarkdownReporter {
       lines.push("| Symbol | Type | Count | Files |");
       lines.push("|--------|------|-------|-------|");
 
-      for (const symbol of analysis.symbolsUsed) {
-        const uniqueFiles = new Set(symbol.locations.map((l) => l.file)).size;
+      for (const sym of analysis.symbolsUsed) {
+        const uniqueFiles = new Set(sym.locations.map((l) => l.file)).size;
         lines.push(
-          `| \`${symbol.symbol}\` | ${symbol.importType} | ${symbol.count} | ${uniqueFiles} |`
+          `| \`${sym.symbol}\` | ${sym.importType} | ${sym.count} | ${uniqueFiles} |`
         );
       }
       lines.push("");
+
+      // Detailed locations per symbol
+      lines.push("### Symbol Locations");
+      lines.push("");
+      for (const sym of analysis.symbolsUsed.slice(0, 10)) {
+        lines.push(`**\`${sym.symbol}\`** (${sym.count}x)`);
+        lines.push("");
+        // Show up to 5 locations per symbol
+        for (const loc of sym.locations.slice(0, 5)) {
+          lines.push(`- \`${loc.file}:${loc.line}\``);
+        }
+        if (sym.locations.length > 5) {
+          lines.push(`- *...and ${sym.locations.length - 5} more*`);
+        }
+        lines.push("");
+      }
+      if (analysis.symbolsUsed.length > 10) {
+        lines.push(`*...and ${analysis.symbolsUsed.length - 10} more symbols*`);
+        lines.push("");
+      }
     }
 
     // Native Alternatives
