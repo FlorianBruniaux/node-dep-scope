@@ -117,3 +117,21 @@ export {
   shouldIgnoreWellKnown,
   getWellKnownVerdict,
 } from "./rules/well-known-packages.js";
+
+// Migration (V2)
+export {
+  generateMigration,
+  getTemplate,
+  getTemplatedPackages,
+  lodashTemplate,
+  type MigrationContext,
+  type MigrationOutput,
+  type MigrationTemplate,
+  type SymbolMigrationRule,
+} from "./migration/index.js";
+export {
+  resolveTsConfig,
+  parseEsTarget,
+  targetSupports,
+  type TsConfigInfo,
+} from "./utils/tsconfig-resolver.js";

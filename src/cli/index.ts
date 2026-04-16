@@ -21,6 +21,9 @@ import {
 } from "../errors/index.js";
 import { isKnipAvailable } from "../integrations/knip.js";
 import type { ScanResult, Verdict } from "../types/index.js";
+import { generateMigration, getTemplate, getTemplatedPackages } from "../migration/index.js";
+import { resolveTsConfig } from "../utils/tsconfig-resolver.js";
+import type { MigrationContext } from "../migration/types.js";
 
 const VERSION = "0.1.0";
 
@@ -187,6 +190,8 @@ program
         withKnip,
         autoDetectWorkspace,
         wellKnownPatterns: config.wellKnownPatterns,
+        nativeAlternatives: config.nativeAlternatives,
+        duplicateCategories: config.duplicateCategories,
       });
 
       const format = config.format ?? "console";
@@ -212,7 +217,7 @@ program
 
       const dependencies = await analyzer.scanProject(projectPath);
       // Duplicate detection is opt-in (use --check-duplicates or `dep-scope duplicates`)
-      const duplicates = options.checkDuplicates ? detectDuplicates(dependencies) : [];
+      const duplicates = options.checkDuplicates ? detectDuplicates(dependencies, config.duplicateCategories) : [];
 
       // Calculate summary
       const summary = {
@@ -299,6 +304,8 @@ program
         ignore: config.ignore,
         verbose: config.verbose,
         wellKnownPatterns: config.wellKnownPatterns,
+        nativeAlternatives: config.nativeAlternatives,
+        duplicateCategories: config.duplicateCategories,
       });
 
       if (config.verbose) {
@@ -377,10 +384,12 @@ program
         ignore: config.ignore,
         verbose: false,
         wellKnownPatterns: config.wellKnownPatterns,
+        nativeAlternatives: config.nativeAlternatives,
+        duplicateCategories: config.duplicateCategories,
       });
 
       const dependencies = await analyzer.scanProject(projectPath);
-      const duplicates = detectDuplicates(dependencies);
+      const duplicates = detectDuplicates(dependencies, config.duplicateCategories);
 
       if (duplicates.length === 0) {
         console.log("No duplicate libraries detected.");
@@ -452,12 +461,14 @@ program
         ignore: config.ignore,
         verbose: false,
         wellKnownPatterns: config.wellKnownPatterns,
+        nativeAlternatives: config.nativeAlternatives,
+        duplicateCategories: config.duplicateCategories,
       });
 
       console.log(`Generating report for ${projectPath}...`);
 
       const dependencies = await analyzer.scanProject(projectPath);
-      const duplicates = detectDuplicates(dependencies);
+      const duplicates = detectDuplicates(dependencies, config.duplicateCategories);
 
       const summary = {
         total: dependencies.length,
@@ -514,6 +525,118 @@ program
       handleError(error);
     }
   });
+
+// ═══════════════════════════════════════════
+// migrate command
+// ═══════════════════════════════════════════
+
+program
+  .command("migrate <package>")
+  .description("Generate an LLM-ready migration prompt to remove a dependency")
+  .option("-p, --path <path>", "Project path", process.cwd())
+  .option("-s, --src <paths...>", "Source directories")
+  .option(
+    "-o, --output <file>",
+    "Output file path (default: .dep-scope/migrate-<pkg>.md)"
+  )
+  .option("--no-config", "Ignore config file")
+  .action(async (packageName, options) => {
+    try {
+      const projectPath = await validateProjectPath(options.path);
+
+      // Load config and resolve options
+      const fileConfig = options.config !== false ? await loadConfig(projectPath) : null;
+      const cliOptions: Partial<DepScopeConfig> = {
+        ...(options.src && { srcPaths: options.src }),
+      };
+      const config = resolveConfig(cliOptions, fileConfig);
+
+      // Check if a template is available
+      const template = getTemplate(packageName);
+      if (!template) {
+        const available = getTemplatedPackages().join(", ");
+        console.error(
+          `No migration template for "${packageName}".\nAvailable: ${available}`
+        );
+        process.exit(EXIT_ERROR);
+      }
+
+      // Analyze the dependency
+      const analyzer = new UsageAnalyzer({
+        srcPaths: config.srcPaths,
+        threshold: config.threshold,
+        includeDev: true,
+        ignore: config.ignore,
+        verbose: false,
+        wellKnownPatterns: config.wellKnownPatterns,
+        nativeAlternatives: config.nativeAlternatives,
+        duplicateCategories: config.duplicateCategories,
+      });
+
+      console.log(`Analyzing ${packageName} in ${projectPath}...`);
+      const analysis = await analyzer.analyzeSingleDependency(projectPath, packageName);
+
+      // Resolve TypeScript target
+      const tsConfig = resolveTsConfig(projectPath);
+
+      // Detect framework from package.json dependencies
+      const framework = await detectFramework(projectPath);
+
+      const context: MigrationContext = {
+        tsconfigTarget: tsConfig.target,
+        framework,
+        importStyle: analysis.importStyle,
+        projectPath,
+      };
+
+      // Generate migration prompt
+      const output = generateMigration(analysis, context, template);
+
+      // Resolve output path
+      const outputPath = options.output ?? output.outputPath;
+      const resolvedOutput = path.isAbsolute(outputPath)
+        ? outputPath
+        : path.join(projectPath, outputPath);
+
+      // Ensure output directory exists
+      await fs.mkdir(path.dirname(resolvedOutput), { recursive: true });
+      await fs.writeFile(resolvedOutput, output.markdown, "utf-8");
+
+      console.log(`\nMigration prompt generated: ${resolvedOutput}`);
+      console.log(`\nSummary:`);
+      console.log(`  Package:  ${packageName} ${analysis.version}`);
+      console.log(`  Symbols:  ${output.metadata.symbolCount}`);
+      console.log(`  Files:    ${output.metadata.fileCount}`);
+      console.log(`  Target:   ${output.metadata.targetEcmaVersion}`);
+      console.log(`\nTo use with Claude Code:`);
+      console.log(`  claude -p "$(cat ${outputPath})"`);
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+/**
+ * Detect the primary framework from package.json dependencies
+ */
+async function detectFramework(
+  projectPath: string
+): Promise<MigrationContext["framework"]> {
+  try {
+    const pkgPath = path.join(projectPath, "package.json");
+    const content = await fs.readFile(pkgPath, "utf-8");
+    const pkg = JSON.parse(content) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
+
+    if ("next" in allDeps) return "nextjs";
+    if ("react" in allDeps) return "react";
+    return "node";
+  } catch {
+    return "unknown";
+  }
+}
 
 // ═══════════════════════════════════════════
 // init command
