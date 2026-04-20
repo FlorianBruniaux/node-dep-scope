@@ -118,15 +118,33 @@ export class MarkdownReporter {
         lines.push("");
       }
 
-      // Peer Deps (redundant)
-      const peerDeps = actionItems.filter((d) => d.verdict === "PEER_DEP");
-      if (peerDeps.length > 0) {
+      // Peer Deps — CLI tools (should be devDependencies)
+      const cliPeerDeps = actionItems.filter(
+        (d) => d.verdict === "PEER_DEP" && d.peerDepInfo?.isCliTool
+      );
+      if (cliPeerDeps.length > 0) {
+        lines.push("### 🔗 CLI Tools (Move to devDependencies)");
+        lines.push("");
+        lines.push("These packages expose a CLI binary and are not directly imported. Move them to `devDependencies`.");
+        lines.push("");
+        for (const dep of cliPeerDeps) {
+          const requiredBy = dep.peerDepInfo?.requiredBy.join(", ") ?? "unknown";
+          lines.push(`- \`${dep.name}\` - CLI tool, required by: ${requiredBy}`);
+        }
+        lines.push("");
+      }
+
+      // Peer Deps — runtime transitives (redundant in package.json)
+      const runtimePeerDeps = actionItems.filter(
+        (d) => d.verdict === "PEER_DEP" && !d.peerDepInfo?.isCliTool
+      );
+      if (runtimePeerDeps.length > 0) {
         lines.push("### 🔗 Peer Dependencies (Redundant in package.json)");
         lines.push("");
         lines.push("These packages are not directly imported but are required by other dependencies.");
         lines.push("You can safely remove them from `package.json` - they will still be installed as peer dependencies.");
         lines.push("");
-        for (const dep of peerDeps) {
+        for (const dep of runtimePeerDeps) {
           const requiredBy = dep.peerDepInfo?.requiredBy.join(", ") ?? "unknown";
           lines.push(`- \`${dep.name}\` - Required by: ${requiredBy}`);
         }

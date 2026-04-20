@@ -4,6 +4,8 @@
  */
 
 import type { NativeAlternative, SymbolUsage } from "../types/index.js";
+import type { CustomNativeAlternative } from "../config/schema.js";
+import { E18E_PACKAGES } from "./e18e-data.js";
 
 interface AlternativeRule {
   native: string;
@@ -457,28 +459,62 @@ const NATIVE_ALTERNATIVES: Record<string, Record<string, AlternativeRule>> = {
 };
 
 /**
- * Get native alternatives for symbols used from a package
+ * Build a symbol→rule map for a package, merging built-in and custom rules.
+ * Custom rules override built-ins symbol-by-symbol (fine-grained).
+ */
+const resolvePackageRules = (
+  packageName: string,
+  customAlternatives?: CustomNativeAlternative[]
+): Record<string, AlternativeRule> | undefined => {
+  const builtin = NATIVE_ALTERNATIVES[packageName];
+  const custom = customAlternatives?.find((a) => a.package === packageName);
+
+  if (!builtin && !custom) return undefined;
+  if (!custom) return builtin;
+  // Custom takes precedence on symbol collisions
+  return { ...(builtin ?? {}), ...custom.symbols };
+};
+
+/**
+ * Get native alternatives for symbols used from a package.
+ * Optionally merges custom alternatives from user config.
  */
 export const getNativeAlternatives = (
   packageName: string,
-  symbolsUsed: SymbolUsage[]
+  symbolsUsed: SymbolUsage[],
+  customAlternatives?: CustomNativeAlternative[]
 ): NativeAlternative[] => {
-  const packageRules = NATIVE_ALTERNATIVES[packageName];
-  if (!packageRules) {
+  const packageRules = resolvePackageRules(packageName, customAlternatives);
+  const e18eEntry = E18E_PACKAGES[packageName];
+
+  if (!packageRules && !e18eEntry) {
     return [];
   }
 
   const alternatives: NativeAlternative[] = [];
 
   for (const usage of symbolsUsed) {
-    const rule = packageRules[usage.symbol] ?? packageRules["default"];
-    if (rule) {
+    if (packageRules) {
+      const rule = packageRules[usage.symbol] ?? packageRules["default"];
+      if (rule) {
+        alternatives.push({
+          symbol: usage.symbol,
+          native: rule.native,
+          example: rule.example,
+          minEcmaVersion: rule.minEcmaVersion,
+          caveats: rule.caveats,
+        });
+        continue;
+      }
+    }
+    // Fall through to e18e data for any unmatched symbol (covers single-purpose packages)
+    if (e18eEntry) {
       alternatives.push({
         symbol: usage.symbol,
-        native: rule.native,
-        example: rule.example,
-        minEcmaVersion: rule.minEcmaVersion,
-        caveats: rule.caveats,
+        native: e18eEntry.native,
+        example: e18eEntry.native,
+        minEcmaVersion: e18eEntry.minEcmaVersion,
+        caveats: [],
       });
     }
   }
@@ -487,15 +523,20 @@ export const getNativeAlternatives = (
 };
 
 /**
- * Check if a package has any known alternatives
+ * Check if a package has any known alternatives (built-in, e18e, or custom)
  */
-export const hasAlternatives = (packageName: string): boolean => {
-  return packageName in NATIVE_ALTERNATIVES;
+export const hasAlternatives = (
+  packageName: string,
+  customAlternatives?: CustomNativeAlternative[]
+): boolean => {
+  if (packageName in NATIVE_ALTERNATIVES) return true;
+  if (packageName in E18E_PACKAGES) return true;
+  return customAlternatives?.some((a) => a.package === packageName) ?? false;
 };
 
 /**
- * Get all packages with known alternatives
+ * Get all packages with known alternatives (built-in + e18e + custom)
  */
 export const getPackagesWithAlternatives = (): string[] => {
-  return Object.keys(NATIVE_ALTERNATIVES);
+  return [...new Set([...Object.keys(NATIVE_ALTERNATIVES), ...Object.keys(E18E_PACKAGES)])];
 };

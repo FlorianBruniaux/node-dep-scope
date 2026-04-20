@@ -5,15 +5,16 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org/)
 
-**Symbol-level dependency analysis** for TypeScript/JavaScript projects.
+**Symbol-level dependency analysis + LLM-ready migration prompts** for TypeScript/JavaScript projects.
 
-> *"Knip tells you what's unused. dep-scope tells you how you use what you keep."*
+> *"Knip tells you what's unused. dep-scope tells you how you use what you keep — and generates the prompt to remove it."*
 
 ## When to use dep-scope
 
 **Good use cases:**
 - **Legacy project audit**: Finding lodash functions that now have native equivalents
 - **Library consolidation**: Do we really need 3 icon libraries?
+- **Migration**: Generate a context-aware prompt and let Claude Code do the refactoring
 - **Curiosity**: "Which symbols from this 50KB library do we actually use?"
 
 **Not the right tool if:**
@@ -32,38 +33,40 @@ $ dep-scope scan
 Summary:
   Total dependencies: 45
   ✓ Keep:          38
-  ↻ Recode Native: 1
+  ↻ Recode Native: 3
   ✗ Remove:        2
   ⊕ Peer Dep:      4
 
 Action Items:
   Remove (unused):
-    ✗ lodash.isequal
     ✗ moment
+    ✗ has-flag
 
   Recode to native:
-    ↻ lodash.debounce (1 symbol) → native setTimeout pattern
-
-  Peer deps (redundant in package.json):
-    ⊕ react ← required by: react-dom, @tanstack/react-query
+    ↻ lodash.debounce (1 symbol) → custom debounce function
+    ↻ array-includes (1 symbol) → Array.prototype.includes
+    ↻ left-pad (1 symbol) → String.prototype.padStart
 ```
 
 **What it found:**
 - 2 unused packages to remove
-- 1 lodash function replaceable with native code
+- 3 dependencies replaceable with native code (including e18e micro-utilities)
 - 4 peer deps that don't need explicit installation
 
 ## How it compares
 
-| Feature | Knip | Depcheck | dep-scope |
-|---------|------|----------|-----------|
-| Unused detection | ✅ Excellent | ✅ Good | ⚠️ Basic |
-| Config file scanning | ✅ | ✅ | ❌ |
-| Symbol-level analysis | ❌ | ❌ | ✅ |
-| Native alternatives | ❌ | ❌ | ✅ |
-| Duplicate detection | ❌ | ❌ | ✅ |
+| Feature | Knip | Depcheck | Moderne | dep-scope |
+|---------|------|----------|---------|-----------|
+| Unused detection | ✅ Excellent | ✅ Good | ❌ | ⚠️ Basic |
+| Config file scanning | ✅ | ✅ | ❌ | ❌ |
+| Symbol-level analysis | ❌ | ❌ | ✅ | ✅ |
+| Native alternatives database | ❌ | ❌ | ✅ (lodash) | ✅ 195 packages |
+| e18e micro-utilities coverage | ❌ | ❌ | ❌ | ✅ |
+| Duplicate detection | ❌ | ❌ | ❌ | ✅ |
+| LLM migration prompt | ❌ | ❌ | ❌ | ✅ |
+| OSS / free | ✅ | ✅ | ❌ enterprise | ✅ |
 
-**Recommendation**: Use Knip for unused detection, dep-scope for deeper analysis. They work well together (dep-scope auto-detects Knip if installed).
+**Recommendation**: Use Knip for unused detection, dep-scope for deeper analysis and migration. They work well together (dep-scope auto-detects Knip if installed).
 
 ## Installation
 
@@ -98,9 +101,35 @@ cd /path/to/your/project
 # Run a full scan
 dep-scope scan
 
+# Scan with duplicate detection
+dep-scope scan --check-duplicates
+
+# Generate migration prompts for everything that can be removed
+dep-scope migrate
+
 # Generate a markdown report
 dep-scope report -o ./dependency-audit.md
 ```
+
+## Getting accurate results — configure srcPaths
+
+dep-scope scans the directories listed in `srcPaths` (default: `./src`). If your source files live elsewhere the tool will flag packages as unused when they're not.
+
+Create `.depscoperc.json` in your project root:
+
+```json
+{
+  "srcPaths": ["src", "app", "pages", "components", "lib", "hooks", "server"]
+}
+```
+
+Run with `--verbose` to see which paths were used (and whether auto-detection kicked in):
+
+```bash
+dep-scope scan --verbose
+```
+
+Auto-detection is built-in: if `./src` doesn't exist, dep-scope scans `app`, `lib`, `pages`, `components`, `hooks`, `server` automatically. A warning is printed when this happens. Explicit config is always more reliable.
 
 ## Commands
 
@@ -116,12 +145,12 @@ Scans all dependencies and outputs a summary with verdicts.
 | Option | Description | Default |
 |--------|-------------|---------|
 | `-p, --path <path>` | Project path | Current directory |
-| `-s, --src <paths...>` | Source directories to scan | `./src` |
+| `-s, --src <paths...>` | Source directories to scan | `./src` (with auto-detection) |
 | `-t, --threshold <n>` | Symbol count threshold for RECODE verdict | `5` |
 | `-d, --include-dev` | Include devDependencies | `false` |
 | `-f, --format <type>` | Output format: `console`, `markdown`, `json` | `console` |
 | `-o, --output <file>` | Output file path | stdout |
-| `-v, --verbose` | Verbose output | `false` |
+| `-v, --verbose` | Verbose output (shows resolved srcPaths) | `false` |
 | `--ignore <packages...>` | Packages to ignore | none |
 | `--with-knip` | Use Knip for pre-analysis (auto-detected by default) | auto |
 | `--no-knip` | Disable Knip integration even if available | `false` |
@@ -133,10 +162,13 @@ Scans all dependencies and outputs a summary with verdicts.
 **Examples:**
 ```bash
 # Scan with custom source paths
-dep-scope scan -s ./src ./lib ./app
+dep-scope scan -s src lib app components
 
 # Scan including devDependencies
 dep-scope scan -d
+
+# Scan with duplicate detection
+dep-scope scan --check-duplicates
 
 # Output as JSON
 dep-scope scan -f json -o ./deps.json
@@ -169,6 +201,66 @@ Detects libraries serving the same purpose (e.g., multiple icon libraries, date 
 
 **Detected categories:** icons, date, cssUtils, http, state, dnd, validation, forms, animation, markdown, uuid, lodashLike
 
+### `migrate` - Generate LLM-ready migration prompts
+
+```bash
+dep-scope migrate [package] [options]
+```
+
+Generates a structured markdown prompt that a LLM (Claude Code, Cursor, etc.) can follow to remove a dependency and replace its usages with native alternatives.
+
+**Without a package argument**, dep-scope scans the project, finds all `RECODE_NATIVE` and `CONSOLIDATE` dependencies that have known native alternatives, and generates one prompt file per candidate.
+
+**With a package name**, generates a prompt for that specific dependency.
+
+**Options:**
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-p, --path <path>` | Project path | Current directory |
+| `-s, --src <paths...>` | Source directories | `./src` (with auto-detection) |
+| `-o, --output <file>` | Output path (single-package mode only) | `.dep-scope/migrate-<pkg>.md` |
+| `--dry-run` | Preview candidates without writing files | `false` |
+
+**Examples:**
+```bash
+# Preview what would be generated (no files written)
+dep-scope migrate --dry-run
+
+# Auto-detect all migration candidates and generate prompts
+dep-scope migrate
+
+# Target a specific package
+dep-scope migrate lodash
+dep-scope migrate uuid -p /path/to/project
+
+# Pipe directly into Claude Code
+claude -p "$(cat .dep-scope/migrate-lodash.md)"
+
+# Or use claude -p with all generated prompts
+for f in .dep-scope/migrate-*.md; do
+  echo "--- $f ---"
+  claude -p "$(cat $f)"
+done
+```
+
+**What the generated prompt includes:**
+- Audit summary: package, symbols used, files affected, TypeScript target, framework, complexity label
+- Per-symbol refactoring plan with exact file locations (`src/hooks/useSearch.ts:12`)
+- Native replacement code snippets, adapted to your ES target (e.g. `structuredClone` only when target ≥ ES2022)
+- Polyfill fallbacks when your target is below the native API's minimum version
+- Step-by-step instructions: branch, replace, build, test, uninstall
+- Verification checklist and rollback instructions
+
+**Supported packages:**
+
+| Package | Coverage |
+|---------|----------|
+| `lodash` / `lodash-es` | Hand-crafted: 12 symbols + catch-all |
+| `moment` | Hand-crafted: 11 symbols (format, add, diff, parse, isBefore...) |
+| `axios` | Hand-crafted: 8 symbols (get, post, put, interceptors...) |
+| `uuid`, `nanoid`, `classnames`, `qs`, `query-string`, `slugify`, `ms`, `escape-html`, `deep-equal` | Generic (from native-alternatives database) |
+| 169 e18e packages | Generic: `has-flag`, `left-pad`, `array-includes`, `object-assign`, `is-windows`, `is-ci`, `uniq`, `arrify`, `array.prototype.*`, `string.prototype.*`, `object.*`, and more |
+
 ### `report` - Generate full audit report
 
 ```bash
@@ -182,19 +274,6 @@ Generates a comprehensive markdown or JSON report.
 dep-scope report -o ./audit.md
 dep-scope report -p ./my-project -f json -o ./audit.json
 ```
-
-### `init` - Create config file
-
-```bash
-dep-scope init [options]
-```
-
-Creates a `.depscoperc.json` config file with sensible defaults.
-
-**Options:**
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-p, --path <path>` | Project path | Current directory |
 
 ## Configuration
 
@@ -217,7 +296,7 @@ Config files are detected in this order:
 **JSON** (`.depscoperc.json`):
 ```json
 {
-  "srcPaths": ["./src", "./lib"],
+  "srcPaths": ["src", "app", "pages", "components", "lib", "hooks"],
   "threshold": 8,
   "includeDev": false,
   "ignore": ["@internal/*"],
@@ -231,25 +310,25 @@ Config files are detected in this order:
 **YAML** (`depscope.config.yaml`):
 ```yaml
 srcPaths:
-  - ./src
-  - ./lib
+  - src
+  - app
+  - components
 threshold: 8
 ignore:
   - "@internal/*"
 fileCountThreshold: 3
-autoDetectWorkspace: true
 ```
 
 ### Configuration Options
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `srcPaths` | string[] | `["./src"]` | Source directories to scan |
+| `srcPaths` | string[] | `["./src"]` | Source directories to scan. Auto-detected if paths don't exist. |
 | `threshold` | number | `5` | Symbol count threshold for RECODE verdict |
 | `includeDev` | boolean | `false` | Include devDependencies |
 | `ignore` | string[] | `[]` | Packages to ignore (supports globs) |
 | `format` | string | `"console"` | Output format: console, markdown, json |
-| `verbose` | boolean | `false` | Verbose output |
+| `verbose` | boolean | `false` | Verbose output (shows resolved paths, warnings) |
 | `fileCountThreshold` | number | `3` | Minimum file count to auto-KEEP (skip INVESTIGATE) |
 | `autoDetectWorkspace` | boolean | `true` | Auto-detect monorepo workspaces |
 
@@ -266,7 +345,7 @@ node_modules, dist, .next, coverage
 import { defineConfig } from "dep-scope";
 
 export default defineConfig({
-  srcPaths: ["./src"],
+  srcPaths: ["src", "app", "components"],
   threshold: 8,
   wellKnownPatterns: [
     { pattern: "@company/*", verdict: "KEEP", reason: "Internal packages" },
@@ -325,13 +404,13 @@ Automatically assign KEEP or IGNORE verdicts to packages matching patterns:
 
 ### Custom Native Alternatives
 
-Extend the native alternatives database:
+Extend the native alternatives database for packages not already covered:
 
 ```json
 {
   "nativeAlternatives": [
     {
-      "package": "left-pad",
+      "package": "my-custom-util",
       "symbols": {
         "default": {
           "native": "String.prototype.padStart()",
@@ -386,7 +465,7 @@ Arrays (`ignore`, `wellKnownPatterns`) are **merged**, not replaced.
 
 - **REMOVE**: No imports detected in source files
 - **PEER_DEP**: No direct imports, but required by other installed packages
-- **RECODE_NATIVE**: Less than `threshold` symbols used AND native alternatives exist (e.g., `uuid.v4` → `crypto.randomUUID()`)
+- **RECODE_NATIVE**: Less than `threshold` symbols used AND native alternatives exist (built-in DB or e18e)
 - **CONSOLIDATE**: Multiple libraries from same category detected (e.g., lucide-react + react-icons)
 - **INVESTIGATE**: Low usage but no clear alternative (with reason)
 - **KEEP**: Significant usage, no issues
@@ -408,6 +487,53 @@ When a package gets the INVESTIGATE verdict, dep-scope shows **why**:
 ? fast-glob (1 symbol in 2 files) [low file spread]
 ```
 
+## Native Alternatives Database
+
+dep-scope flags 195 packages as having native replacements, across two sources:
+
+### Built-in (symbol-level, hand-curated)
+
+| Library | Symbol | Native Alternative |
+|---------|--------|-------------------|
+| lodash | `get` | Optional chaining `?.` |
+| lodash | `cloneDeep` | `structuredClone()` |
+| lodash | `uniq` | `[...new Set(arr)]` |
+| lodash | `debounce` | Custom function (ES6) |
+| moment | `format` | `Intl.DateTimeFormat` |
+| moment | `add` / `subtract` | `date-fns` or `Temporal` |
+| axios | `get` / `post` | `fetch()` |
+| uuid | `v4` | `crypto.randomUUID()` |
+| nanoid | `nanoid` | `crypto.randomUUID()` |
+| classnames | default | Template literals or `clsx` |
+| query-string | `parse/stringify` | `URLSearchParams` |
+| slugify | default | `str.toLowerCase().replace(/\s+/g, '-')` |
+
+### e18e micro-utilities (169 packages)
+
+Single-purpose packages that ship something native JS already provides. Any symbol imported from these packages gets the native equivalent shown:
+
+| Package | Native |
+|---------|--------|
+| `has-flag` | `process.argv.includes('--flag')` |
+| `left-pad` / `pad-left` | `String.prototype.padStart` |
+| `array-includes` | `Array.prototype.includes` |
+| `object-assign` / `object.assign` | `Object.assign` |
+| `is-windows` | `process.platform === 'win32'` |
+| `is-ci` | `Boolean(process.env.CI)` |
+| `is-even` / `is-odd` | `(n % 2) === 0` |
+| `array-uniq` / `uniq` | `[...new Set(arr)]` |
+| `arrify` | `Array.isArray(v) ? v : [v]` |
+| `filter-obj` | `Object.fromEntries(Object.entries(obj).filter(fn))` |
+| `global` / `globalthis` | `globalThis` |
+| `inherits` | Native `class extends` |
+| `concat-map` | `Array.prototype.flatMap` |
+| `array.prototype.*` (20+) | Direct method call |
+| `string.prototype.*` (15+) | Direct method call |
+| `object.*` (10+) | Direct method call |
+| ... and 100+ more | — |
+
+Source: [e18e/module-replacements](https://github.com/es-tooling/module-replacements) — embedded statically, no runtime dependency added.
+
 ## Example Output
 
 ```
@@ -418,15 +544,15 @@ When a package gets the INVESTIGATE verdict, dep-scope shows **why**:
 Summary:
   Total dependencies: 120
   ✓ Keep:          29
-  ↻ Recode Native: 2
+  ↻ Recode Native: 5
   ⇄ Consolidate:   14
   ✗ Remove:        3
   ⊕ Peer Dep:      1
-  ? Investigate:   71
+  ? Investigate:   68
 
 Estimated Savings:
   Bundle: ~112KB (gzipped)
-  Dependencies: 17
+  Dependencies: 22
 
 Duplicate Libraries:
   icons: Icon libraries
@@ -443,6 +569,8 @@ Action Items:
 
   Recode to native:
     ↻ uuid (1 symbol: v4) → crypto.randomUUID()
+    ↻ has-flag (1 symbol: hasFlag) → process.argv.includes('--flag')
+    ↻ left-pad (1 symbol: leftPad) → String.prototype.padStart
 ```
 
 ## Programmatic API
@@ -459,7 +587,7 @@ import {
 
 // Basic usage
 const analyzer = new UsageAnalyzer({
-  srcPaths: ['./src'],
+  srcPaths: ['./src', './app', './components'],
   threshold: 5,
   includeDev: false,
 });
@@ -470,7 +598,7 @@ const duplicates = detectDuplicates(dependencies);
 // Find unused dependencies
 const unused = dependencies.filter(d => d.verdict === 'REMOVE');
 
-// Find dependencies with native alternatives
+// Find dependencies with native alternatives (includes e18e packages)
 const recodable = dependencies.filter(d => d.verdict === 'RECODE_NATIVE');
 recodable.forEach(dep => {
   console.log(`${dep.name}: ${dep.alternatives.map(a => a.native).join(', ')}`);
@@ -508,31 +636,13 @@ import { defineConfig } from 'dep-scope';
 
 export default defineConfig({
   extends: 'react',
+  srcPaths: ['src', 'app', 'components'],
   threshold: 8,
   wellKnownPatterns: [
     { pattern: '@myorg/*', verdict: 'KEEP', reason: 'Internal packages' },
   ],
 });
 ```
-
-## Native Alternatives Database
-
-dep-scope suggests native replacements for common libraries:
-
-| Library | Symbol | Native Alternative |
-|---------|--------|-------------------|
-| lodash | `get` | Optional chaining `?.` |
-| lodash | `cloneDeep` | `structuredClone()` |
-| lodash | `uniq` | `[...new Set(arr)]` |
-| moment | `format` | `Intl.DateTimeFormat` |
-| axios | `get/post` | `fetch()` |
-| uuid | `v4` | `crypto.randomUUID()` |
-| nanoid | `nanoid` | `crypto.randomUUID()` |
-| classnames | - | Template literals or `clsx` |
-| query-string | `parse/stringify` | `URLSearchParams` |
-| slugify | `default` | `str.toLowerCase().replace(/\s+/g, '-')` |
-| escape-html | `default` | `str.replace(/[&<>"']/g, ...)` |
-| deep-equal | `default` | `JSON.stringify(a) === JSON.stringify(b)` |
 
 ## Knip Integration
 
@@ -615,6 +725,8 @@ The analyzer uses static AST analysis. It won't detect:
 
 Use `--ignore` to exclude packages you know are used in config files. Knip integration (enabled by default) helps detect config-referenced packages.
 
+The most common cause of inaccurate results is an incomplete `srcPaths` configuration. If a package appears as REMOVE but you know it's used, check that its import files are inside the scanned directories.
+
 ## Claude Code Integration
 
 dep-scope includes a custom slash command for [Claude Code](https://claude.ai/code). Once installed, use `/audit-deps` in any project to get an AI-assisted dependency audit with actionable recommendations.
@@ -624,11 +736,6 @@ dep-scope includes a custom slash command for [Claude Code](https://claude.ai/co
 ```bash
 # Copy the command to your global Claude commands
 cp /path/to/node-dep-scope/.claude/commands/audit-deps.md ~/.claude/commands/
-```
-
-Or with curl (after npm publish):
-```bash
-mkdir -p ~/.claude/commands && curl -o ~/.claude/commands/audit-deps.md https://raw.githubusercontent.com/florianb/node-dep-scope/main/.claude/commands/audit-deps.md
 ```
 
 ### Usage

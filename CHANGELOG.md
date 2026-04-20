@@ -5,9 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2026-04-19
 
 ### Added
+
+- **`dep-scope migrate` command**: Generates LLM-ready markdown migration prompts for dependencies flagged as removable. Covers both `RECODE_NATIVE` and `CONSOLIDATE` packages that have known native alternatives.
+  - Run without arguments to auto-detect all candidates in the project.
+  - Pass a package name to target a specific dependency.
+  - Outputs one file per package in `.dep-scope/migrate-<pkg>.md`.
+  - Prints a `claude -p "$(cat ...)"` one-liner ready to pipe into Claude Code.
+  - `--dry-run` flag: preview which packages would be targeted without writing any files.
+  - Complexity label per package: `trivial / easy / medium / complex` based on file count.
+  - CONSOLIDATE pair deduplication: when two packages in the same duplicate group both have native alternatives, only the package with fewer usages is targeted (avoids contradictory prompts).
+
+- **e18e integration** (`src/rules/e18e-data.ts`): 169 packages from the [e18e module-replacements](https://e18e.dev) project are now recognized as RECODE_NATIVE candidates. No runtime dependency — data is embedded statically at build time. Covers single-purpose polyfills and micro-utilities: `has-flag`, `array-includes`, `left-pad`, `object-assign`, `is-windows`, `is-ci`, `is-even`, `uniq`, `arrify`, the full `array.prototype.*` / `string.prototype.*` / `object.*` families, and more. Total packages with alternatives: **15 → 195**.
+
+- **Migration templates** — hand-crafted for richer prompts:
+  - **Lodash** (`src/migration/templates/lodash.ts`): 12 symbols — `debounce`, `throttle`, `cloneDeep`, `isEqual`, `merge`, `omit`, `pick`, `uniq`, `flatten`, `get`, `groupBy`, `isEmpty` — plus a catch-all. Polyfill fallbacks for targets below the native API's minimum version.
+  - **Moment** (`src/migration/templates/moment.ts`): 11 symbols — `format`, `fromNow`, `add`, `subtract`, `isBefore`, `isAfter`, `diff`, `parse`, `startOf`, `endOf`, plus default. Global caveats for timezone and immutability differences.
+  - **Axios** (`src/migration/templates/axios.ts`): 8 symbols — `get`, `post`, `put`, `patch`, `delete`, `create`, `interceptors`, plus default. Caveats for `response.ok`, JSON parsing, and AbortController for timeouts.
+
+- **Dynamic template engine**: Migration prompts are generated from hand-crafted templates first, then fall back to a generic engine built on the native-alternatives database. Any package with a known replacement gets a prompt automatically — no template file required.
+
+- **TypeScript target detection** (`src/utils/tsconfig-resolver.ts`): Resolves the project's `compilerOptions.target` by following `extends` chains transitively, including npm package extends (e.g. `@tsconfig/node18`). Used to tailor migration prompts to the actual runtime target (e.g. `structuredClone` only suggested for ES2022+).
+
+- **JSONC comment parser**: Replaced the previous regex-based comment stripper with a string-aware state-machine parser. Fixes a bug where glob patterns in `compilerOptions.paths` (e.g. `"@/*": ["./src/*"]`) were incorrectly matched as comment delimiters.
+
+- **srcPaths auto-detection** (`src/utils/src-paths-resolver.ts`): When configured source paths don't exist on disk, all commands now automatically fall back to scanning common directories (`src`, `lib`, `app`, `pages`, `components`, `hooks`, `server`). A warning is printed when auto-detection is used.
 
 - **Knip Auto-Detection**: Knip is now automatically used when available in the project. Use `--no-knip` to disable.
 - **Path Alias Filtering**: Path aliases (`@/`, `~/`, tsconfig paths) are now automatically filtered from import analysis to avoid false positives.
@@ -17,8 +41,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `migrate <package>` argument is now optional. Omitting it triggers a full project scan and generates prompts for every migratable dependency.
+- Migration template lookup falls back to a generic engine when no dedicated template exists.
 - `--with-knip` is now the default behavior when Knip is installed in the project.
 - CONSOLIDATE verdict only appears when `--check-duplicates` is explicitly used.
+- `scan`, `analyze`, `duplicates`, and `report` all use `resolveSrcPaths()` — srcPaths auto-detection applies to every command.
+
+### Fixed
+
+- TSConfig resolver returned `ES3` on projects using glob patterns in `compilerOptions.paths` (e.g. Next.js projects). The multi-line comment regex `/\/\*[\s\S]*?\*\//g` incorrectly matched `/*` inside JSON string values like `"@/*"` and consumed content up to the next real `*/`. Replaced with a proper JSONC parser that skips string literals.
 
 ## [0.1.0] - 2025-01-10
 
@@ -108,5 +139,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dependencies: @typescript-eslint/parser, commander, fast-glob, picocolors, zod, yaml, jiti
 - Node.js >= 18.0.0 required
 
-[Unreleased]: https://github.com/florianb/node-dep-scope/compare/v0.1.0...HEAD
+[0.2.0]: https://github.com/florianb/node-dep-scope/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/florianb/node-dep-scope/releases/tag/v0.1.0

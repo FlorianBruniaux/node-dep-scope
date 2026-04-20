@@ -155,11 +155,29 @@ export class ConsoleReporter {
       console.log("");
     }
 
-    // Peer Deps (redundant in package.json)
-    const peerDeps = actionItems.filter((d) => d.verdict === "PEER_DEP");
-    if (peerDeps.length > 0) {
+    // Peer Deps — CLI tools (should be in devDependencies)
+    const cliPeerDeps = actionItems.filter(
+      (d) => d.verdict === "PEER_DEP" && d.peerDepInfo?.isCliTool
+    );
+    if (cliPeerDeps.length > 0) {
+      console.log(`  ${pc.blue("CLI tools (move to devDependencies):")}`);
+      for (const dep of cliPeerDeps) {
+        const requiredBy = dep.peerDepInfo?.requiredBy.slice(0, 3).join(", ") ?? "unknown";
+        const more = (dep.peerDepInfo?.requiredBy.length ?? 0) > 3 ? ", ..." : "";
+        console.log(
+          `    ${pc.blue("⊕")} ${dep.name} ${pc.dim(`← CLI tool, required by: ${requiredBy}${more}. Move to devDependencies.`)}`
+        );
+      }
+      console.log("");
+    }
+
+    // Peer Deps — runtime transitives (redundant in package.json)
+    const runtimePeerDeps = actionItems.filter(
+      (d) => d.verdict === "PEER_DEP" && !d.peerDepInfo?.isCliTool
+    );
+    if (runtimePeerDeps.length > 0) {
       console.log(`  ${pc.blue("Peer deps (redundant in package.json):")}`);
-      for (const dep of peerDeps) {
+      for (const dep of runtimePeerDeps) {
         const requiredBy = dep.peerDepInfo?.requiredBy.slice(0, 3).join(", ") ?? "unknown";
         const more = (dep.peerDepInfo?.requiredBy.length ?? 0) > 3 ? ", ..." : "";
         console.log(

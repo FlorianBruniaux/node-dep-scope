@@ -58,11 +58,7 @@ function resolveTsConfigFile(
 
   let config: Record<string, unknown>;
   try {
-    // Strip single-line and multi-line comments (TSConfig allows them)
-    const cleaned = rawContent
-      .replace(/\/\/.*$/gm, "")
-      .replace(/\/\*[\s\S]*?\*\//g, "");
-    config = JSON.parse(cleaned) as Record<string, unknown>;
+    config = JSON.parse(stripJsoncComments(rawContent)) as Record<string, unknown>;
   } catch {
     return { ...TS_DEFAULTS };
   }
@@ -101,6 +97,65 @@ function resolveTsConfigFile(
  */
 function normalize(value: string): string {
   return value.toUpperCase();
+}
+
+/**
+ * Strip single-line (//) and multi-line (/* *\/) comments from JSONC content,
+ * correctly skipping over string literals so that patterns like "./src/*"
+ * are never mistaken for comment delimiters.
+ */
+function stripJsoncComments(input: string): string {
+  let result = "";
+  let i = 0;
+  const len = input.length;
+
+  while (i < len) {
+    const ch = input[i];
+
+    // String literal — copy verbatim including escape sequences
+    if (ch === '"') {
+      result += ch;
+      i++;
+      while (i < len) {
+        const c = input[i];
+        result += c;
+        if (c === "\\") {
+          // Escaped character: copy the next char as-is
+          i++;
+          if (i < len) {
+            result += input[i];
+            i++;
+          }
+          continue;
+        }
+        if (c === '"') {
+          i++;
+          break;
+        }
+        i++;
+      }
+      continue;
+    }
+
+    // Single-line comment (//)
+    if (ch === "/" && input[i + 1] === "/") {
+      while (i < len && input[i] !== "\n") i++;
+      continue;
+    }
+
+    // Multi-line comment (/* ... */)
+    if (ch === "/" && input[i + 1] === "*") {
+      i += 2;
+      while (i < len && !(input[i] === "*" && input[i + 1] === "/")) i++;
+      i += 2; // skip closing */
+      continue;
+    }
+
+    result += ch;
+    i++;
+  }
+
+  return result;
 }
 
 /**

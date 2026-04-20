@@ -4,9 +4,9 @@
  * Aggregates import information into dependency analysis
  */
 
-import { ImportAnalyzer, importAnalyzer as defaultImportAnalyzer } from "./import-analyzer.js";
-import { PeerDepAnalyzer, peerDepAnalyzer as defaultPeerDepAnalyzer } from "./peer-dep-analyzer.js";
-import { VerdictEngine, verdictEngine as defaultVerdictEngine } from "./verdict-engine.js";
+import { importAnalyzer as defaultImportAnalyzer } from "./import-analyzer.js";
+import { peerDepAnalyzer as defaultPeerDepAnalyzer } from "./peer-dep-analyzer.js";
+import { verdictEngine as defaultVerdictEngine } from "./verdict-engine.js";
 import { PackageNotFoundError } from "../errors/index.js";
 import type {
   AnalyzerOptions,
@@ -29,9 +29,9 @@ import { detectWorkspace } from "../utils/workspace-detector.js";
 import { shouldIgnoreWellKnown } from "../rules/well-known-packages.js";
 import { DEFAULT_WELL_KNOWN_PATTERNS } from "../config/defaults.js";
 import { createPathAliasChecker } from "../utils/path-alias-detector.js";
-import { PackageJsonReader, packageJsonReader as defaultPackageJsonReader } from "../utils/package-json-reader.js";
-import { SourceFileScanner, sourceFileScanner as defaultSourceFileScanner } from "../utils/source-file-scanner.js";
-import { ImportAggregator, importAggregator as defaultImportAggregator } from "../utils/import-aggregator.js";
+import { packageJsonReader as defaultPackageJsonReader } from "../utils/package-json-reader.js";
+import { sourceFileScanner as defaultSourceFileScanner } from "../utils/source-file-scanner.js";
+import { importAggregator as defaultImportAggregator } from "../utils/import-aggregator.js";
 import { ConsoleLogger } from "../utils/logger.js";
 
 /**
@@ -362,8 +362,12 @@ export class UsageAnalyzer {
     // Get unique files
     const files = this.importAggregator.getUniqueFiles(imports);
 
-    // Get native alternatives
-    const alternatives = getNativeAlternatives(packageName, symbolsUsed);
+    // Get native alternatives (built-in + user-provided custom)
+    const alternatives = getNativeAlternatives(
+      packageName,
+      symbolsUsed,
+      this.options.nativeAlternatives
+    );
 
     // Update peer dep info with actual usage
     const updatedPeerDepInfo = peerDepInfo
@@ -425,7 +429,8 @@ export class UsageAnalyzer {
     for (const analysis of analyses) {
       const duplicateCategory = hasDuplicatesInstalled(
         analysis.name,
-        installedPackages
+        installedPackages,
+        this.options.duplicateCategories
       );
       if (
         duplicateCategory &&

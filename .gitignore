@@ -24,3 +24,6 @@ coverage/
 # Generated reports
 *.audit.md
 audit-report.md
+
+# MCP local config (machine-specific absolute paths)
+.mcp.json

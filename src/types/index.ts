@@ -47,6 +47,8 @@ export interface PeerDependencyInfo {
   onlyPeerDep: boolean;
   /** Whether removing from package.json is safe (will still be installed via peer) */
   safeToRemoveFromPackageJson: boolean;
+  /** True if the package exposes a CLI binary (has `bin` field in its package.json) */
+  isCliTool?: boolean;
 }
 
 export interface NativeAlternative {
@@ -154,6 +156,10 @@ export interface AnalyzerOptions {
   autoDetectWorkspace?: boolean;
   /** Well-known package patterns for automatic verdicts */
   wellKnownPatterns?: import("../config/schema.js").WellKnownPattern[];
+  /** Custom native alternatives (merged with built-in NATIVE_ALTERNATIVES) */
+  nativeAlternatives?: import("../config/schema.js").CustomNativeAlternative[];
+  /** Custom duplicate categories (merged with built-in DUPLICATE_CATEGORIES) */
+  duplicateCategories?: import("../config/schema.js").CustomDuplicateCategory[];
 }
 
 export interface KnipPreAnalysis {

@@ -4,6 +4,7 @@
  */
 
 import type { DependencyAnalysis, DuplicateGroup, LibraryUsage } from "../types/index.js";
+import type { CustomDuplicateCategory } from "../config/schema.js";
 
 interface CategoryDefinition {
   description: string;
@@ -195,15 +196,38 @@ const DUPLICATE_CATEGORIES: Record<string, CategoryDefinition> = {
 };
 
 /**
+ * Merge built-in categories with user-provided custom categories.
+ * Custom categories with a name matching a built-in replace it.
+ */
+const mergeCategories = (
+  custom?: CustomDuplicateCategory[]
+): Record<string, CategoryDefinition> => {
+  if (!custom || custom.length === 0) return DUPLICATE_CATEGORIES;
+
+  const merged: Record<string, CategoryDefinition> = { ...DUPLICATE_CATEGORIES };
+  for (const c of custom) {
+    merged[c.name] = {
+      description: c.description,
+      packages: c.packages,
+      recommendation: c.recommendation,
+      preferredOrder: c.preferredOrder ?? [],
+    };
+  }
+  return merged;
+};
+
+/**
  * Detect duplicate libraries in a list of dependency analyses
  */
 export const detectDuplicates = (
-  analyses: DependencyAnalysis[]
+  analyses: DependencyAnalysis[],
+  customCategories?: CustomDuplicateCategory[]
 ): DuplicateGroup[] => {
   const duplicates: DuplicateGroup[] = [];
   const analyzedPackages = new Set(analyses.map((a) => a.name));
+  const categories = mergeCategories(customCategories);
 
-  for (const [category, definition] of Object.entries(DUPLICATE_CATEGORIES)) {
+  for (const [category, definition] of Object.entries(categories)) {
     // Find which packages from this category are installed
     const installedInCategory = definition.packages.filter((pkg) =>
       analyzedPackages.has(pkg)
@@ -303,12 +327,14 @@ const estimateSavings = (libraries: LibraryUsage[]): number => {
 };
 
 /**
- * Get category for a package
+ * Get category for a package (built-in + optional custom)
  */
 export const getCategoryForPackage = (
-  packageName: string
+  packageName: string,
+  customCategories?: CustomDuplicateCategory[]
 ): string | undefined => {
-  for (const [category, definition] of Object.entries(DUPLICATE_CATEGORIES)) {
+  const categories = mergeCategories(customCategories);
+  for (const [category, definition] of Object.entries(categories)) {
     if (definition.packages.includes(packageName)) {
       return category;
     }
@@ -317,10 +343,14 @@ export const getCategoryForPackage = (
 };
 
 /**
- * Get all packages in a category
+ * Get all packages in a category (built-in + optional custom)
  */
-export const getCategoryPackages = (category: string): string[] => {
-  return DUPLICATE_CATEGORIES[category]?.packages ?? [];
+export const getCategoryPackages = (
+  category: string,
+  customCategories?: CustomDuplicateCategory[]
+): string[] => {
+  const categories = mergeCategories(customCategories);
+  return categories[category]?.packages ?? [];
 };
 
 /**
@@ -329,12 +359,13 @@ export const getCategoryPackages = (category: string): string[] => {
  */
 export const hasDuplicatesInstalled = (
   packageName: string,
-  installedPackages: string[]
+  installedPackages: string[],
+  customCategories?: CustomDuplicateCategory[]
 ): string | undefined => {
-  const category = getCategoryForPackage(packageName);
+  const category = getCategoryForPackage(packageName, customCategories);
   if (!category) return undefined;
 
-  const categoryPackages = getCategoryPackages(category);
+  const categoryPackages = getCategoryPackages(category, customCategories);
   const otherInstalled = categoryPackages.filter(
     (pkg) => pkg !== packageName && installedPackages.includes(pkg)
   );

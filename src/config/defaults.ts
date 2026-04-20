@@ -98,6 +98,15 @@ export const DEFAULT_WELL_KNOWN_PATTERNS: WellKnownPattern[] = [
   { pattern: "@trpc/*", verdict: "KEEP", reason: "tRPC framework" },
   { pattern: "trpc", verdict: "KEEP", reason: "tRPC framework" },
 
+  // Framework runtime companions - loaded by the framework, may have zero direct imports
+  // (e.g. react-dom is used by Next.js internally; the modern JSX transform means React apps
+  // can legitimately have zero `import React` statements)
+  { pattern: "react", verdict: "KEEP", reason: "React runtime (may be unused via JSX transform)" },
+  { pattern: "react-dom", verdict: "KEEP", reason: "React DOM renderer (loaded by framework)" },
+  { pattern: "react-native", verdict: "KEEP", reason: "React Native runtime" },
+  { pattern: "scheduler", verdict: "KEEP", reason: "React scheduler (required by react-dom)" },
+  { pattern: "tslib", verdict: "KEEP", reason: "TypeScript runtime helpers" },
+
   // Validation libraries - single schema file is normal
   { pattern: "zod", verdict: "KEEP", reason: "Validation library" },
   { pattern: "valibot", verdict: "KEEP", reason: "Validation library" },

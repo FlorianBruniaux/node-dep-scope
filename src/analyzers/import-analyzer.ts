@@ -87,6 +87,23 @@ export class ImportAnalyzer {
   }
 
   /**
+   * Decide whether to enable JSX parsing for this file.
+   *
+   * `.tsx`/`.jsx` always enable JSX. Pure `.ts` files disable JSX to avoid
+   * conflicts between JSX tags and TypeScript generics (e.g. `async <T>(x) => ...`
+   * is parsed as a JSX opening tag when `jsx: true`, causing
+   * "Unexpected token. Did you mean `{'>'}` or `&gt;`?" errors).
+   *
+   * Matches TypeScript's native `--jsx` behavior (only `.tsx`).
+   */
+  private shouldEnableJsx(filePath: string): boolean {
+    if (filePath.endsWith(".tsx") || filePath.endsWith(".jsx")) return true;
+    if (filePath.endsWith(".ts")) return false;
+    // .js / .mjs / .cjs / other: keep JSX enabled (no TS-generics conflict possible)
+    return true;
+  }
+
+  /**
    * Analyze content string and extract all imports
    */
   analyzeContent(content: string, filePath: string): ImportInfo[] {
@@ -96,7 +113,7 @@ export class ImportAnalyzer {
       const ast = parse(content, {
         sourceType: "module",
         ecmaVersion: "latest",
-        jsx: true,
+        jsx: this.shouldEnableJsx(filePath),
         loc: true,
         range: true,
       });
@@ -104,7 +121,8 @@ export class ImportAnalyzer {
       this.traverseNode(ast, imports, filePath);
     } catch (error) {
       // Skip files that can't be parsed (e.g., invalid syntax)
-      this.logger.warn(`Warning: Could not parse ${filePath}`);
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Warning: Could not parse ${filePath}: ${msg}`);
     }
 
     return imports;

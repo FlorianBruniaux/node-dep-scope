@@ -15,6 +15,7 @@ interface PackageJson {
   devDependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
   optionalDependencies?: Record<string, string>;
+  bin?: string | Record<string, string>;
 }
 
 /**
@@ -79,11 +80,14 @@ export class PeerDepAnalyzer {
     // Convert to PeerDependencyInfo
     for (const [pkg, requiredBySet] of reverseDeps.entries()) {
       const requiredBy = Array.from(requiredBySet);
+      const pkgJson = await this.readPackageJson(nodeModulesPath, pkg); // already cached from above loop
+      const isCliTool = pkgJson?.bin !== undefined;
 
       result.set(pkg, {
         requiredBy,
         onlyPeerDep: false, // Will be updated by usage analyzer
         safeToRemoveFromPackageJson: requiredBy.length > 0,
+        isCliTool,
       });
     }
 
@@ -118,10 +122,12 @@ export class PeerDepAnalyzer {
       }
     }
 
+    const targetPkgJson = await this.readPackageJson(nodeModulesPath, packageName);
     return {
       requiredBy,
       onlyPeerDep: false, // Will be determined by caller based on import analysis
       safeToRemoveFromPackageJson: requiredBy.length > 0,
+      isCliTool: targetPkgJson?.bin !== undefined,
     };
   }
 

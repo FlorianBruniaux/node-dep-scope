@@ -14,16 +14,16 @@ export const lodashTemplate: MigrationTemplate = {
       nativeReplacement: "Custom debounce (ES6)",
       minEcmaVersion: "ES6",
       caveats: [],
-      example: `const debounce = <T extends (...args: unknown[]) => void>(
-  fn: T,
+      example: `function debounce<T extends unknown[]>(
+  fn: (...args: T) => void,
   ms: number
-): ((...args: Parameters<T>) => void) => {
+): (...args: T) => void {
   let timeout: ReturnType<typeof setTimeout>;
-  return (...args: Parameters<T>) => {
+  return (...args: T) => {
     clearTimeout(timeout);
     timeout = setTimeout(() => fn(...args), ms);
   };
-};`,
+}`,
     },
 
     throttle: {
@@ -31,19 +31,19 @@ export const lodashTemplate: MigrationTemplate = {
       nativeReplacement: "Custom throttle (ES6)",
       minEcmaVersion: "ES6",
       caveats: ["Leading-edge only by default — adjust to match lodash behavior if needed"],
-      example: `const throttle = <T extends (...args: unknown[]) => void>(
-  fn: T,
+      example: `function throttle<T extends unknown[]>(
+  fn: (...args: T) => void,
   ms: number
-): ((...args: Parameters<T>) => void) => {
+): (...args: T) => void {
   let last = 0;
-  return (...args: Parameters<T>) => {
+  return (...args: T) => {
     const now = Date.now();
     if (now - last >= ms) {
       last = now;
       fn(...args);
     }
   };
-};`,
+}`,
     },
 
     cloneDeep: {

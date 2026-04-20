@@ -20,18 +20,18 @@ import {
   ProjectNotFoundError,
 } from "../errors/index.js";
 import { isKnipAvailable } from "../integrations/knip.js";
-import type { ScanResult, Verdict } from "../types/index.js";
-import { generateMigration, getTemplate, getTemplatedPackages } from "../migration/index.js";
+import type { ScanResult } from "../types/index.js";
+import { generateMigration, getOrBuildTemplate } from "../migration/index.js";
 import { resolveTsConfig } from "../utils/tsconfig-resolver.js";
+import { resolveSrcPaths } from "../utils/src-paths-resolver.js";
 import type { MigrationContext } from "../migration/types.js";
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 
 const VALID_FORMATS = ["console", "markdown", "json"] as const;
 type Format = (typeof VALID_FORMATS)[number];
 
 // Exit codes for CI integration
-const EXIT_SUCCESS = 0;
 const EXIT_ISSUES_FOUND = 1;
 const EXIT_ERROR = 2;
 
@@ -93,6 +93,28 @@ function handleError(error: unknown): never {
   }
 
   process.exit(EXIT_ERROR);
+}
+
+/**
+ * Build a UsageAnalyzer with src paths auto-resolved.
+ * If no configured paths exist on disk, auto-detects common directories.
+ */
+function buildAnalyzer(
+  config: ReturnType<typeof resolveConfig>,
+  projectPath: string,
+  framework?: string
+): UsageAnalyzer {
+  const srcPaths = resolveSrcPaths(projectPath, config.srcPaths, framework);
+  return new UsageAnalyzer({
+    srcPaths,
+    threshold: config.threshold,
+    includeDev: config.includeDev ?? false,
+    ignore: config.ignore,
+    verbose: config.verbose ?? false,
+    wellKnownPatterns: config.wellKnownPatterns,
+    nativeAlternatives: config.nativeAlternatives,
+    duplicateCategories: config.duplicateCategories,
+  });
 }
 
 /**
@@ -180,8 +202,9 @@ program
       // autoDetect is false when --no-auto-detect is used
       const autoDetectWorkspace = options.autoDetect !== false;
 
+      const srcPaths = resolveSrcPaths(projectPath, config.srcPaths);
       const analyzer = new UsageAnalyzer({
-        srcPaths: config.srcPaths,
+        srcPaths,
         threshold: config.threshold,
         fileCountThreshold: config.fileCountThreshold,
         includeDev: config.includeDev,
@@ -253,7 +276,7 @@ program
       };
 
       // Output
-      await outputResult(result, format, output, "scan", options.actionableOnly);
+      await outputResult(result, format, output, options.actionableOnly);
 
       // Exit with appropriate code for CI
       if (options.exitCode !== false && hasActionableIssues(result, !!options.checkDuplicates)) {
@@ -297,8 +320,9 @@ program
       const format = config.format ?? "console";
       const output = config.output ?? options.output;
 
+      const srcPaths = resolveSrcPaths(projectPath, config.srcPaths);
       const analyzer = new UsageAnalyzer({
-        srcPaths: config.srcPaths,
+        srcPaths,
         threshold: config.threshold,
         includeDev: true,
         ignore: config.ignore,
@@ -377,8 +401,9 @@ program
       const format = config.format ?? "console";
       const output = config.output ?? options.output;
 
+      const srcPaths = resolveSrcPaths(projectPath, config.srcPaths);
       const analyzer = new UsageAnalyzer({
-        srcPaths: config.srcPaths,
+        srcPaths,
         threshold: config.threshold,
         includeDev: false,
         ignore: config.ignore,
@@ -454,8 +479,9 @@ program
       const format = config.format ?? "markdown";
       const output = config.output ?? options.output ?? "./dep-scope-report.md";
 
+      const srcPaths = resolveSrcPaths(projectPath, config.srcPaths);
       const analyzer = new UsageAnalyzer({
-        srcPaths: config.srcPaths,
+        srcPaths,
         threshold: config.threshold,
         includeDev: config.includeDev,
         ignore: config.ignore,
@@ -531,85 +557,173 @@ program
 // ═══════════════════════════════════════════
 
 program
-  .command("migrate <package>")
-  .description("Generate an LLM-ready migration prompt to remove a dependency")
+  .command("migrate [package]")
+  .description(
+    "Generate LLM-ready migration prompts. Pass a package name to target one dep, " +
+    "or omit it to auto-detect all migratable dependencies in the project."
+  )
   .option("-p, --path <path>", "Project path", process.cwd())
   .option("-s, --src <paths...>", "Source directories")
   .option(
     "-o, --output <file>",
-    "Output file path (default: .dep-scope/migrate-<pkg>.md)"
+    "Output file path — only valid when targeting a single package"
   )
+  .option("--dry-run", "Preview what would be generated without writing files")
   .option("--no-config", "Ignore config file")
-  .action(async (packageName, options) => {
+  .action(async (packageName: string | undefined, options) => {
     try {
       const projectPath = await validateProjectPath(options.path);
 
-      // Load config and resolve options
       const fileConfig = options.config !== false ? await loadConfig(projectPath) : null;
       const cliOptions: Partial<DepScopeConfig> = {
         ...(options.src && { srcPaths: options.src }),
+        includeDev: true,
       };
       const config = resolveConfig(cliOptions, fileConfig);
 
-      // Check if a template is available
-      const template = getTemplate(packageName);
-      if (!template) {
-        const available = getTemplatedPackages().join(", ");
-        console.error(
-          `No migration template for "${packageName}".\nAvailable: ${available}`
-        );
-        process.exit(EXIT_ERROR);
-      }
-
-      // Analyze the dependency
-      const analyzer = new UsageAnalyzer({
-        srcPaths: config.srcPaths,
-        threshold: config.threshold,
-        includeDev: true,
-        ignore: config.ignore,
-        verbose: false,
-        wellKnownPatterns: config.wellKnownPatterns,
-        nativeAlternatives: config.nativeAlternatives,
-        duplicateCategories: config.duplicateCategories,
-      });
-
-      console.log(`Analyzing ${packageName} in ${projectPath}...`);
-      const analysis = await analyzer.analyzeSingleDependency(projectPath, packageName);
-
-      // Resolve TypeScript target
       const tsConfig = resolveTsConfig(projectPath);
-
-      // Detect framework from package.json dependencies
       const framework = await detectFramework(projectPath);
+      const analyzer = buildAnalyzer(config, projectPath, framework);
 
       const context: MigrationContext = {
         tsconfigTarget: tsConfig.target,
         framework,
-        importStyle: analysis.importStyle,
+        importStyle: "barrel",
         projectPath,
       };
 
-      // Generate migration prompt
-      const output = generateMigration(analysis, context, template);
+      const dryRun = options.dryRun === true;
+      if (dryRun) console.log("(dry-run — no files will be written)\n");
 
-      // Resolve output path
-      const outputPath = options.output ?? output.outputPath;
-      const resolvedOutput = path.isAbsolute(outputPath)
-        ? outputPath
-        : path.join(projectPath, outputPath);
+      if (packageName) {
+        // ── Single-package mode ──────────────────────────────────────
+        console.log(`Analyzing ${packageName} in ${projectPath}...`);
+        const analysis = await analyzer.analyzeSingleDependency(projectPath, packageName);
 
-      // Ensure output directory exists
-      await fs.mkdir(path.dirname(resolvedOutput), { recursive: true });
-      await fs.writeFile(resolvedOutput, output.markdown, "utf-8");
+        const template = getOrBuildTemplate(packageName, analysis);
+        if (!template) {
+          console.error(
+            `No migration data for "${packageName}". ` +
+            `dep-scope has no native alternatives recorded for this package.`
+          );
+          process.exit(EXIT_ERROR);
+        }
 
-      console.log(`\nMigration prompt generated: ${resolvedOutput}`);
-      console.log(`\nSummary:`);
-      console.log(`  Package:  ${packageName} ${analysis.version}`);
-      console.log(`  Symbols:  ${output.metadata.symbolCount}`);
-      console.log(`  Files:    ${output.metadata.fileCount}`);
-      console.log(`  Target:   ${output.metadata.targetEcmaVersion}`);
-      console.log(`\nTo use with Claude Code:`);
-      console.log(`  claude -p "$(cat ${outputPath})"`);
+        const output = generateMigration(analysis, { ...context, importStyle: analysis.importStyle }, template);
+        const outputPath = options.output ?? output.outputPath;
+        const resolvedOutput = path.isAbsolute(outputPath)
+          ? outputPath
+          : path.join(projectPath, outputPath);
+
+        if (!dryRun) {
+          await fs.mkdir(path.dirname(resolvedOutput), { recursive: true });
+          await fs.writeFile(resolvedOutput, output.markdown, "utf-8");
+          console.log(`\nMigration prompt generated: ${resolvedOutput}`);
+        } else {
+          console.log(`\nWould generate: ${resolvedOutput}`);
+        }
+
+        console.log(`\nSummary:`);
+        console.log(`  Package:  ${packageName} ${analysis.version}`);
+        console.log(`  Symbols:  ${output.metadata.symbolCount}`);
+        console.log(`  Files:    ${output.metadata.fileCount}`);
+        console.log(`  Target:   ${output.metadata.targetEcmaVersion}`);
+        if (!dryRun) {
+          console.log(`\nTo use with Claude Code:`);
+          console.log(`  claude -p "$(cat ${outputPath})"`);
+        }
+      } else {
+        // ── Auto-detect mode ─────────────────────────────────────────
+        console.log(`Scanning ${projectPath} for migration candidates...`);
+        const dependencies = await analyzer.scanProject(projectPath);
+
+        // Run duplicate detection to resolve CONSOLIDATE pairs
+        const duplicates = detectDuplicates(dependencies, config.duplicateCategories);
+
+        // Build a map: packageName → names of other packages in same duplicate group
+        const duplicateGroupMembers = new Map<string, string[]>();
+        for (const group of duplicates) {
+          const names = group.libraries.map((l) => l.name);
+          for (const name of names) {
+            duplicateGroupMembers.set(name, names.filter((n) => n !== name));
+          }
+        }
+
+        // RECODE_NATIVE: direct native replacement candidates
+        // CONSOLIDATE with alternatives: only keep the loser (fewest files) when
+        //   multiple packages in the same group all have native alternatives,
+        //   to avoid generating conflicting prompts (e.g. uuid↔nanoid both → crypto.randomUUID)
+        const consolidateCandidates = dependencies.filter(
+          (d) => d.verdict === "CONSOLIDATE" && d.alternatives.length > 0
+        );
+
+        const filteredConsolidate = consolidateCandidates.filter((dep) => {
+          const groupPeers = duplicateGroupMembers.get(dep.name) ?? [];
+          const conflictingPeers = consolidateCandidates.filter((c) =>
+            groupPeers.includes(c.name)
+          );
+          if (conflictingPeers.length === 0) return true;
+
+          // Multiple candidates in same group — keep only the one with fewest files (the loser)
+          const allInGroup = [dep, ...conflictingPeers];
+          const loser = allInGroup.reduce((min, curr) =>
+            curr.files.length < min.files.length ? curr : min
+          );
+          return dep.name === loser.name;
+        });
+
+        const candidates = [
+          ...dependencies.filter((d) => d.verdict === "RECODE_NATIVE"),
+          ...filteredConsolidate,
+        ];
+
+        if (candidates.length === 0) {
+          console.log("No migration candidates found — nothing to generate.");
+          return;
+        }
+
+        const outputDir = path.join(projectPath, ".dep-scope");
+        if (!dryRun) await fs.mkdir(outputDir, { recursive: true });
+
+        const generated: Array<{ name: string; slug: string; fileCount: number }> = [];
+        const skipped: string[] = [];
+
+        for (const dep of candidates) {
+          const template = getOrBuildTemplate(dep.name, dep);
+          if (!template) {
+            skipped.push(dep.name);
+            continue;
+          }
+
+          const output = generateMigration(dep, { ...context, importStyle: dep.importStyle }, template);
+          const slug = dep.name.replace(/[@/]/g, "-").replace(/^-/, "");
+          const filePath = path.join(outputDir, `migrate-${slug}.md`);
+
+          if (!dryRun) {
+            await fs.writeFile(filePath, output.markdown, "utf-8");
+          }
+          generated.push({ name: dep.name, slug, fileCount: dep.fileCount });
+        }
+
+        const verb = dryRun ? "Would generate" : "Generated";
+        console.log(`\n${verb} ${generated.length} migration prompt(s) in .dep-scope/`);
+
+        for (const { name, slug, fileCount } of generated) {
+          const complexity = fileCount <= 1 ? "trivial" : fileCount <= 5 ? "easy" : fileCount <= 20 ? "medium" : "complex";
+          console.log(`  ${name} → .dep-scope/migrate-${slug}.md  (${fileCount} file${fileCount !== 1 ? "s" : ""}, ${complexity})`);
+        }
+
+        if (skipped.length > 0) {
+          console.log(`\nSkipped (no migration data): ${skipped.join(", ")}`);
+        }
+
+        if (!dryRun && generated.length > 0) {
+          console.log(`\nTo migrate with Claude Code:`);
+          for (const { slug } of generated) {
+            console.log(`  claude -p "$(cat .dep-scope/migrate-${slug}.md)"`);
+          }
+        }
+      }
     } catch (error) {
       handleError(error);
     }
@@ -691,7 +805,6 @@ async function outputResult(
   result: ScanResult,
   format: Format,
   output: string | undefined,
-  type: "scan" | "duplicates",
   actionableOnly?: boolean
 ): Promise<void> {
   switch (format) {

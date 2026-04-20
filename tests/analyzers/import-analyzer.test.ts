@@ -257,13 +257,50 @@ describe("ImportAnalyzer", () => {
         expect(imports).toHaveLength(0);
       });
 
-      it("should handle JSX syntax", () => {
+      it("should handle JSX syntax in .tsx files", () => {
         const code = `
           import React from "react";
           const Component = () => <div>Hello</div>;
         `;
-        const imports = analyzer.analyzeContent(code, testFile);
+        const imports = analyzer.analyzeContent(code, "/test/file.tsx");
         expect(imports).toHaveLength(1);
+      });
+
+      it("should handle JSX syntax in .jsx files", () => {
+        const code = `
+          import React from "react";
+          const Component = () => <span>hi</span>;
+        `;
+        const imports = analyzer.analyzeContent(code, "/test/file.jsx");
+        expect(imports).toHaveLength(1);
+      });
+
+      it("should parse .ts file with async generic arrow function", () => {
+        // Regression: jsx: true was forced for all files, causing
+        // `async <T>(x) => ...` to be parsed as JSX opening tag and fail with
+        // "Unexpected token. Did you mean `{'>'}` or `&gt;`?"
+        const code = `
+          import { useState } from "react";
+          export const fetcher = async <T>(url: string): Promise<T> => {
+            const res = await fetch(url);
+            return res.json() as T;
+          };
+        `;
+        const imports = analyzer.analyzeContent(code, "/test/use-fetch.ts");
+        expect(imports).toHaveLength(1);
+        expect(imports[0].packageName).toBe("react");
+      });
+
+      it("should parse .ts file with non-async generic arrow function", () => {
+        const code = `
+          import { gzipSync } from "zlib";
+          export const decompress = <T>(value: string): T[] => {
+            return JSON.parse(value) as T[];
+          };
+        `;
+        const imports = analyzer.analyzeContent(code, "/test/compression.ts");
+        expect(imports).toHaveLength(1);
+        expect(imports[0].packageName).toBe("zlib");
       });
 
       it("should return empty array for invalid syntax", () => {
