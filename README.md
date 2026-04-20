@@ -7,7 +7,7 @@
 
 **Symbol-level dependency analysis + LLM-ready migration prompts** for TypeScript/JavaScript projects.
 
-> *"Knip tells you what's unused. dep-scope tells you how you use what you keep — and generates the prompt to remove it."*
+> *"Knip tells you what's unused. dep-scope tells you how you use what you keep, and generates the prompt to remove it."*
 
 ## When to use dep-scope
 
@@ -111,7 +111,7 @@ dep-scope migrate
 dep-scope report -o ./dependency-audit.md
 ```
 
-## Getting accurate results — configure srcPaths
+## Getting accurate results: configure srcPaths
 
 dep-scope scans the directories listed in `srcPaths` (default: `./src`). If your source files live elsewhere the tool will flag packages as unused when they're not.
 
@@ -532,7 +532,7 @@ Single-purpose packages that ship something native JS already provides. Any symb
 | `object.*` (10+) | Direct method call |
 | ... and 100+ more | — |
 
-Source: [e18e/module-replacements](https://github.com/es-tooling/module-replacements) — embedded statically, no runtime dependency added.
+Source: [e18e/module-replacements](https://github.com/es-tooling/module-replacements), embedded statically with no runtime dependency added.
 
 ## Example Output
 
@@ -731,12 +731,12 @@ The most common cause of inaccurate results is an incomplete `srcPaths` configur
 
 Copy-paste these prompts into Claude Code, Cursor, Copilot Chat, or any AI assistant to get an immediate, guided dep-scope audit. No slash command setup required.
 
-### Full audit — one-shot prompt
+### Full audit: one-shot prompt
 
 ```
 Run `dep-scope scan --check-duplicates --verbose` on this project (current directory).
 Then analyze the output:
-1. List all REMOVE packages — confirm each is truly unused before flagging it
+1. List all REMOVE packages (confirm each is truly unused before flagging it)
 2. List all RECODE_NATIVE packages with their native alternatives
 3. List all CONSOLIDATE groups and identify the winner to keep
 4. List INVESTIGATE packages worth a second look (ignore the obvious false positives)
@@ -747,7 +747,7 @@ If srcPaths seems wrong (packages flagged REMOVE that you know are used), re-run
 `-s src app pages components lib hooks` and note the discrepancy.
 ```
 
-### Migration audit — full project
+### Migration audit: full project
 
 ```
 Run `dep-scope migrate --dry-run` on this project to see all migration candidates.
@@ -757,7 +757,7 @@ For each generated file in .dep-scope/:
 2. Confirm the file locations are accurate
 3. Ask me which package to migrate first
 Once I confirm, run the migration by reading the corresponding migrate-<pkg>.md file
-and following its instructions exactly — including creating a branch, replacing imports,
+and following its instructions exactly, including creating a branch, replacing imports,
 running build and tests, and uninstalling the package.
 If dep-scope is not installed: `npm install -g @florianbruniaux/dep-scope` first.
 ```
@@ -776,7 +776,7 @@ Then read the generated .dep-scope/migrate-lodash.md file and follow its instruc
 If dep-scope is not installed: `npm install -g @florianbruniaux/dep-scope` first.
 ```
 
-### Quick scan — actionable items only
+### Quick scan: actionable items only
 
 ```
 Run `dep-scope scan --actionable-only` on this project.
@@ -790,13 +790,13 @@ If dep-scope is not installed: `npm install -g @florianbruniaux/dep-scope` first
 ### Audit + auto-migrate pipeline (advanced)
 
 ```
-Step 1 — Audit: run `dep-scope scan --check-duplicates`
-Step 2 — Identify candidates: run `dep-scope migrate --dry-run`
-Step 3 — For each candidate shown, ask me for confirmation before proceeding
-Step 4 — For each confirmed package, run `dep-scope migrate <package>` and
+Step 1: Audit (`dep-scope scan --check-duplicates`)
+Step 2: Identify candidates (`dep-scope migrate --dry-run`)
+Step 3: For each candidate shown, ask me for confirmation before proceeding
+Step 4: For each confirmed package, run `dep-scope migrate <package>` and
           execute the generated prompt from .dep-scope/migrate-<pkg>.md
-Step 5 — After each migration: npm run build && npm test — stop if either fails
-Step 6 — Final report: list what was removed, what's left, and estimated bundle savings
+Step 5: After each migration, run `npm run build && npm test`. Stop if either fails.
+Step 6: Final report, listing what was removed, what's left, and estimated bundle savings
 Work through candidates one at a time. Never migrate two packages simultaneously.
 If dep-scope is not installed: `npm install -g @florianbruniaux/dep-scope` first.
 ```
