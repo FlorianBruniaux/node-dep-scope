@@ -56,7 +56,14 @@ const NATIVE_ALTERNATIVES: Record<string, Record<string, AlternativeRule>> = {
       native: "structuredClone()",
       example: "structuredClone(obj)",
       minEcmaVersion: "ES2022",
-      caveats: ["Cannot clone functions", "Cannot clone DOM nodes"],
+      caveats: [
+        "Cannot clone functions",
+        "Cannot clone DOM nodes",
+        "Cannot clone class instances with methods (loses prototype)",
+        "Cannot clone Symbols",
+        "Cannot clone Error objects in some environments",
+        "Cannot clone Map/Set keys that are non-serializable",
+      ],
     },
     isEqual: {
       native: "JSON comparison or custom deep equal",
@@ -143,32 +150,80 @@ const NATIVE_ALTERNATIVES: Record<string, Record<string, AlternativeRule>> = {
   axios: {
     get: {
       native: "fetch()",
-      example: "const data = await fetch(url).then(r => r.json())",
+      example: `const res = await fetch(url);
+if (!res.ok) throw new Error(\`HTTP \${res.status}\`);
+const data = await res.json();`,
       minEcmaVersion: "ES2017",
+      caveats: [
+        "Must manually check res.ok — fetch() does not throw on 4xx/5xx",
+        "No request/response interceptors",
+        "No automatic retry logic",
+        "No built-in timeout (use AbortController + setTimeout)",
+      ],
     },
     post: {
       native: "fetch() with options",
-      example: `await fetch(url, {
+      example: `const res = await fetch(url, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(data)
-}).then(r => r.json())`,
+  body: JSON.stringify(data),
+});
+if (!res.ok) throw new Error(\`HTTP \${res.status}\`);
+const result = await res.json();`,
       minEcmaVersion: "ES2017",
+      caveats: [
+        "Must manually check res.ok — fetch() does not throw on 4xx/5xx",
+        "No request/response interceptors",
+        "No built-in timeout (use AbortController)",
+      ],
     },
     put: {
       native: "fetch() with method PUT",
-      example: "await fetch(url, { method: 'PUT', body: JSON.stringify(data) })",
+      example: `await fetch(url, {
+  method: 'PUT',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(data),
+})`,
       minEcmaVersion: "ES2017",
+      caveats: ["Must manually check res.ok — fetch() does not throw on 4xx/5xx"],
     },
     delete: {
       native: "fetch() with method DELETE",
       example: "await fetch(url, { method: 'DELETE' })",
       minEcmaVersion: "ES2017",
+      caveats: ["Must manually check res.ok — fetch() does not throw on 4xx/5xx"],
+    },
+    create: {
+      native: "Custom fetch wrapper",
+      example: `const api = (baseURL: string) => ({
+  get: (path: string) => fetch(baseURL + path).then(r => { if (!r.ok) throw new Error(\`HTTP \${r.status}\`); return r.json(); }),
+  post: (path: string, body: unknown) => fetch(baseURL + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json()),
+});`,
+      minEcmaVersion: "ES2017",
+      caveats: [
+        "No interceptors — implement middleware pattern manually if needed",
+        "No automatic auth token refresh",
+      ],
+    },
+    interceptors: {
+      native: "Custom fetch wrapper with middleware",
+      example: `// Use a fetch wrapper library (ky) or build a small interceptor chain`,
+      caveats: [
+        "Native fetch has no interceptor API",
+        "Consider 'ky' (2kb) for interceptors without the full axios payload",
+        "If interceptors are used heavily, this migration may not be worthwhile",
+      ],
     },
     default: {
       native: "fetch() API",
-      example: "Native fetch is available in all modern browsers and Node 18+",
-      caveats: ["No automatic JSON transform", "No request/response interceptors"],
+      example: "Native fetch is available in all modern browsers and Node.js 18+",
+      caveats: [
+        "No automatic JSON transform — must call res.json() manually",
+        "No request/response interceptors",
+        "fetch() does not throw on 4xx/5xx — must check res.ok",
+        "No built-in timeout — use AbortController + setTimeout",
+        "If axios.interceptors or axios.create() is used heavily, evaluate 'ky' instead",
+      ],
     },
   },
 
@@ -177,12 +232,18 @@ const NATIVE_ALTERNATIVES: Record<string, Record<string, AlternativeRule>> = {
       native: "crypto.randomUUID()",
       example: "crypto.randomUUID()",
       minEcmaVersion: "ES2021",
-      caveats: ["Requires Node.js 19+ or modern browsers"],
+      caveats: [
+        "Requires Node.js 19+ or modern browsers",
+        "Requires secure context (HTTPS) in browsers — not available on plain HTTP",
+      ],
     },
     default: {
       native: "crypto.randomUUID()",
       example: "crypto.randomUUID()",
       minEcmaVersion: "ES2021",
+      caveats: [
+        "Requires secure context (HTTPS) in browsers — not available on plain HTTP",
+      ],
     },
   },
 
@@ -274,7 +335,13 @@ const NATIVE_ALTERNATIVES: Record<string, Record<string, AlternativeRule>> = {
       native: "structuredClone()",
       example: "structuredClone(obj)",
       minEcmaVersion: "ES2022",
-      caveats: ["Cannot clone functions", "Cannot clone DOM nodes"],
+      caveats: [
+        "Cannot clone functions",
+        "Cannot clone DOM nodes",
+        "Cannot clone class instances with methods (loses prototype)",
+        "Cannot clone Symbols",
+        "Cannot clone Map/Set keys that are non-serializable",
+      ],
     },
   },
 
@@ -322,7 +389,11 @@ const NATIVE_ALTERNATIVES: Record<string, Record<string, AlternativeRule>> = {
       native: "crypto.randomUUID()",
       example: "crypto.randomUUID().replace(/-/g, '').slice(0, 21)",
       minEcmaVersion: "ES2021",
-      caveats: ["Different format than nanoid default", "Requires Node.js 19+"],
+      caveats: [
+        "Different format than nanoid default (nanoid uses URL-safe alphabet, randomUUID produces hex+dashes)",
+        "Requires Node.js 19+ or modern browsers",
+        "Requires secure context (HTTPS) in browsers — not available on plain HTTP",
+      ],
     },
   },
 

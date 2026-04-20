@@ -154,6 +154,21 @@ export class ImportAnalyzer {
           const requireImport = this.processRequireCall(node, filePath);
           if (requireImport) imports.push(requireImport);
           break;
+
+        // Barrel file re-exports: export { x } from 'pkg'
+        case AST_NODE_TYPES.ExportNamedDeclaration:
+          if ((node as TSESTree.ExportNamedDeclaration).source) {
+            imports.push(...this.processReexportDeclaration(node as TSESTree.ExportNamedDeclaration, filePath));
+          }
+          break;
+
+        // Barrel file re-exports: export * from 'pkg'
+        case AST_NODE_TYPES.ExportAllDeclaration:
+          if ((node as TSESTree.ExportAllDeclaration).source) {
+            const reexport = this.processReexportAll(node as TSESTree.ExportAllDeclaration, filePath);
+            if (reexport) imports.push(reexport);
+          }
+          break;
       }
     }
 
@@ -301,6 +316,77 @@ export class ImportAnalyzer {
       importPath: source,
       symbol: "*",
       importType: "namespace", // require returns the full module
+      location: {
+        file: filePath,
+        line: node.loc?.start.line ?? 0,
+        column: node.loc?.start.column ?? 0,
+      },
+    };
+  }
+
+  /**
+   * Process a named re-export: export { x, y } from 'pkg'
+   * Counts as usage of the source package in barrel files.
+   */
+  private processReexportDeclaration(
+    node: TSESTree.ExportNamedDeclaration,
+    filePath: string
+  ): ImportInfo[] {
+    const imports: ImportInfo[] = [];
+    const source = node.source!.value as string;
+
+    // Skip relative imports — re-exporting from relative path is fine
+    if (source.startsWith(".") || source.startsWith("/")) {
+      return imports;
+    }
+
+    const packageName = this.extractPackageName(source);
+    const location: Location = {
+      file: filePath,
+      line: node.loc?.start.line ?? 0,
+      column: node.loc?.start.column ?? 0,
+    };
+
+    for (const specifier of node.specifiers) {
+      const local = specifier.local;
+      const symbolName = local.type === AST_NODE_TYPES.Identifier
+        ? local.name
+        : (local as TSESTree.StringLiteral).value;
+
+      imports.push({
+        packageName,
+        importPath: source,
+        symbol: symbolName,
+        importType: symbolName === "default" ? "default" : "named",
+        location,
+      });
+    }
+
+    return imports;
+  }
+
+  /**
+   * Process a wildcard re-export: export * from 'pkg' or export * as ns from 'pkg'
+   * Counts as namespace usage of the source package in barrel files.
+   */
+  private processReexportAll(
+    node: TSESTree.ExportAllDeclaration,
+    filePath: string
+  ): ImportInfo | null {
+    const source = node.source.value as string;
+
+    // Skip relative imports
+    if (source.startsWith(".") || source.startsWith("/")) {
+      return null;
+    }
+
+    const packageName = this.extractPackageName(source);
+
+    return {
+      packageName,
+      importPath: source,
+      symbol: "*",
+      importType: "namespace",
       location: {
         file: filePath,
         line: node.loc?.start.line ?? 0,

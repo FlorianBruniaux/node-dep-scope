@@ -177,6 +177,19 @@ export const DEFAULT_WELL_KNOWN_PATTERNS: WellKnownPattern[] = [
   { pattern: "bcrypt*", verdict: "KEEP", reason: "Password hashing" },
   { pattern: "argon2", verdict: "KEEP", reason: "Password hashing" },
 
+  // CSS reset / base stylesheets — side-effect import only (import 'normalize.css')
+  { pattern: "normalize.css", verdict: "IGNORE", reason: "CSS reset (side-effect import)" },
+  { pattern: "reset-css", verdict: "IGNORE", reason: "CSS reset (side-effect import)" },
+  { pattern: "modern-normalize", verdict: "IGNORE", reason: "CSS reset (side-effect import)" },
+  { pattern: "sanitize.css", verdict: "IGNORE", reason: "CSS reset (side-effect import)" },
+  { pattern: "the-new-css-reset", verdict: "IGNORE", reason: "CSS reset (side-effect import)" },
+  { pattern: "minireset.css", verdict: "IGNORE", reason: "CSS reset (side-effect import)" },
+
+  // Web font packages — side-effect import only (import '@fontsource/inter')
+  { pattern: "@fontsource/*", verdict: "IGNORE", reason: "Web font (side-effect import)" },
+  { pattern: "fontsource-*", verdict: "IGNORE", reason: "Web font (side-effect import)" },
+  { pattern: "@fontsource-variable/*", verdict: "IGNORE", reason: "Variable web font (side-effect import)" },
+
   // CSS animation libraries (import via @import, not detected)
   { pattern: "tw-animate-css", verdict: "KEEP", reason: "CSS animations (@import)" },
   { pattern: "animate.css", verdict: "KEEP", reason: "CSS animations (@import)" },

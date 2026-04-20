@@ -474,6 +474,95 @@ import { useQuery } from "@tanstack/react-query";
       });
     });
 
+    describe("barrel file re-exports", () => {
+      it("should detect named re-exports from npm packages", () => {
+        const code = `export { formatDate, parseDate } from "date-fns";`;
+        const imports = analyzer.analyzeContent(code, testFile);
+
+        expect(imports).toHaveLength(2);
+        expect(imports[0]).toMatchObject({
+          packageName: "date-fns",
+          symbol: "formatDate",
+          importType: "named",
+        });
+        expect(imports[1]).toMatchObject({
+          packageName: "date-fns",
+          symbol: "parseDate",
+          importType: "named",
+        });
+      });
+
+      it("should detect wildcard re-export from npm package", () => {
+        const code = `export * from "date-fns";`;
+        const imports = analyzer.analyzeContent(code, testFile);
+
+        expect(imports).toHaveLength(1);
+        expect(imports[0]).toMatchObject({
+          packageName: "date-fns",
+          symbol: "*",
+          importType: "namespace",
+        });
+      });
+
+      it("should detect re-export with alias", () => {
+        const code = `export * as dateFns from "date-fns";`;
+        const imports = analyzer.analyzeContent(code, testFile);
+
+        expect(imports).toHaveLength(1);
+        expect(imports[0]).toMatchObject({
+          packageName: "date-fns",
+          symbol: "*",
+          importType: "namespace",
+        });
+      });
+
+      it("should detect default re-export from npm package", () => {
+        const code = `export { default } from "lodash";`;
+        const imports = analyzer.analyzeContent(code, testFile);
+
+        expect(imports).toHaveLength(1);
+        expect(imports[0]).toMatchObject({
+          packageName: "lodash",
+          symbol: "default",
+          importType: "default",
+        });
+      });
+
+      it("should detect re-export from scoped package", () => {
+        const code = `export { useQuery, useMutation } from "@tanstack/react-query";`;
+        const imports = analyzer.analyzeContent(code, testFile);
+
+        expect(imports).toHaveLength(2);
+        expect(imports[0].packageName).toBe("@tanstack/react-query");
+        expect(imports[0].symbol).toBe("useQuery");
+      });
+
+      it("should ignore re-exports from relative paths", () => {
+        const code = `
+          export { formatDate } from "./utils";
+          export * from "./helpers";
+        `;
+        const imports = analyzer.analyzeContent(code, testFile);
+
+        expect(imports).toHaveLength(0);
+      });
+
+      it("should detect mix of imports and barrel re-exports", () => {
+        const code = `
+          import { add } from "date-fns";
+          export { formatDate, parseDate } from "date-fns";
+          export * from "lodash";
+        `;
+        const imports = analyzer.analyzeContent(code, testFile);
+
+        expect(imports).toHaveLength(4);
+        const dateFnsImports = imports.filter((i) => i.packageName === "date-fns");
+        expect(dateFnsImports).toHaveLength(3);
+        const lodashImports = imports.filter((i) => i.packageName === "lodash");
+        expect(lodashImports).toHaveLength(1);
+      });
+    });
+
     describe("mixed import styles", () => {
       it("should detect all import types in same file", () => {
         const code = `
