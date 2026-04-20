@@ -1,5 +1,5 @@
 {
-  "name": "dep-scope",
+  "name": "@florianbruniaux/dep-scope",
   "version": "0.2.0",
   "description": "Symbol-level dependency analysis for TypeScript/JavaScript projects. Flags unused deps, native alternatives (195 packages including e18e micro-utilities), and duplicates — then generates LLM-ready migration prompts to remove them.",
   "keywords": [
@@ -28,12 +28,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/florianb/node-dep-scope.git"
+    "url": "git+https://github.com/FlorianBruniaux/node-dep-scope.git"
   },
   "bugs": {
-    "url": "https://github.com/florianb/node-dep-scope/issues"
+    "url": "https://github.com/FlorianBruniaux/node-dep-scope/issues"
   },
-  "homepage": "https://github.com/florianb/node-dep-scope#readme",
+  "homepage": "https://github.com/FlorianBruniaux/node-dep-scope#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

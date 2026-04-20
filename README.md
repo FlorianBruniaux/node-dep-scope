@@ -1,7 +1,7 @@
 # dep-scope
 
-[![CI](https://github.com/florianb/node-dep-scope/actions/workflows/ci.yml/badge.svg)](https://github.com/florianb/node-dep-scope/actions/workflows/ci.yml)
-[![npm version](https://img.shields.io/npm/v/dep-scope.svg)](https://www.npmjs.com/package/dep-scope)
+[![CI](https://github.com/FlorianBruniaux/node-dep-scope/actions/workflows/ci.yml/badge.svg)](https://github.com/FlorianBruniaux/node-dep-scope/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/@florianbruniaux/dep-scope.svg)](https://www.npmjs.com/package/@florianbruniaux/dep-scope)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org/)
 
@@ -70,16 +70,16 @@ Action Items:
 
 ## Installation
 
-### From npm (when published)
+### From npm
 
 ```bash
-npm install -g dep-scope
+npm install -g @florianbruniaux/dep-scope
 ```
 
 ### From source
 
 ```bash
-git clone https://github.com/florianb/node-dep-scope.git
+git clone https://github.com/FlorianBruniaux/node-dep-scope.git
 cd node-dep-scope
 npm install
 npm run build
@@ -89,7 +89,7 @@ npm install -g .
 ### Without installation
 
 ```bash
-npx dep-scope scan
+npx @florianbruniaux/dep-scope scan
 ```
 
 ## Quick Start
@@ -583,7 +583,7 @@ import {
   loadConfig,
   resolveConfig,
   DEFAULT_WELL_KNOWN_PATTERNS
-} from 'dep-scope';
+} from '@florianbruniaux/dep-scope';
 
 // Basic usage
 const analyzer = new UsageAnalyzer({
@@ -614,7 +614,7 @@ investigate.forEach(dep => {
 ### Using Config Files
 
 ```typescript
-import { loadConfig, resolveConfig, UsageAnalyzer } from 'dep-scope';
+import { loadConfig, resolveConfig, UsageAnalyzer } from '@florianbruniaux/dep-scope';
 
 // Load config from project
 const fileConfig = await loadConfig('./my-project');
@@ -632,7 +632,7 @@ For TypeScript config files with full autocomplete:
 
 ```typescript
 // depscope.config.ts
-import { defineConfig } from 'dep-scope';
+import { defineConfig } from '@florianbruniaux/dep-scope';
 
 export default defineConfig({
   extends: 'react',
@@ -742,7 +742,7 @@ Then analyze the output:
 4. List INVESTIGATE packages worth a second look (ignore the obvious false positives)
 5. Produce a prioritized action plan: quick wins (REMOVE + trivial RECODE) first,
    then migrations, then consolidations
-If dep-scope is not installed: `npm install -g dep-scope` first.
+If dep-scope is not installed: `npm install -g @florianbruniaux/dep-scope` first.
 If srcPaths seems wrong (packages flagged REMOVE that you know are used), re-run with
 `-s src app pages components lib hooks` and note the discrepancy.
 ```
@@ -759,7 +759,7 @@ For each generated file in .dep-scope/:
 Once I confirm, run the migration by reading the corresponding migrate-<pkg>.md file
 and following its instructions exactly — including creating a branch, replacing imports,
 running build and tests, and uninstalling the package.
-If dep-scope is not installed: `npm install -g dep-scope` first.
+If dep-scope is not installed: `npm install -g @florianbruniaux/dep-scope` first.
 ```
 
 ### Target a single package
@@ -773,7 +773,7 @@ Then read the generated .dep-scope/migrate-lodash.md file and follow its instruc
 4. Once all symbols are replaced: npm uninstall lodash
 5. Final check: npm run build && npm test
 6. Confirm no remaining imports: grep -r "from 'lodash'" src/
-If dep-scope is not installed: `npm install -g dep-scope` first.
+If dep-scope is not installed: `npm install -g @florianbruniaux/dep-scope` first.
 ```
 
 ### Quick scan — actionable items only
@@ -784,7 +784,7 @@ Show me only what needs action: REMOVE (unused), RECODE_NATIVE (has native alter
 and PEER_DEP (redundant in package.json).
 For each RECODE_NATIVE package, tell me which symbols are used and what the native
 replacement is. Ignore INVESTIGATE for now.
-If dep-scope is not installed: `npm install -g dep-scope` first.
+If dep-scope is not installed: `npm install -g @florianbruniaux/dep-scope` first.
 ```
 
 ### Audit + auto-migrate pipeline (advanced)
@@ -798,7 +798,7 @@ Step 4 — For each confirmed package, run `dep-scope migrate <package>` and
 Step 5 — After each migration: npm run build && npm test — stop if either fails
 Step 6 — Final report: list what was removed, what's left, and estimated bundle savings
 Work through candidates one at a time. Never migrate two packages simultaneously.
-If dep-scope is not installed: `npm install -g dep-scope` first.
+If dep-scope is not installed: `npm install -g @florianbruniaux/dep-scope` first.
 ```
 
 ### Multi-project QA prompt
