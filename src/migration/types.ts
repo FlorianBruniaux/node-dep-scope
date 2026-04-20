@@ -12,6 +12,8 @@ export interface MigrationContext {
   importStyle: "barrel" | "direct" | "mixed";
   /** Absolute path to the project root */
   projectPath: string;
+  /** Detected package manager ("npm" | "pnpm" | "yarn" | "bun"), defaults to "npm" */
+  packageManager?: "npm" | "pnpm" | "yarn" | "bun";
 }
 
 export interface SymbolMigrationRule {

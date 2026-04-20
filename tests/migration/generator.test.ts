@@ -112,11 +112,11 @@ describe("generateMigration", () => {
     expect(markdown).toContain("reducer.ts");
   });
 
-  it("markdown contains verification checklist", () => {
+  it("markdown contains verification checklist with npm commands", () => {
     const { markdown } = generateMigration(makeAnalysis(), makeContext(), lodashTemplate);
     expect(markdown).toContain("Verification checklist");
     expect(markdown).toContain("npm run build");
-    expect(markdown).toContain("npm test");
+    expect(markdown).toContain("npm run test");
   });
 
   it("markdown contains rollback instructions", () => {
@@ -128,6 +128,28 @@ describe("generateMigration", () => {
   it("markdown contains steps to uninstall the package", () => {
     const { markdown } = generateMigration(makeAnalysis(), makeContext(), lodashTemplate);
     expect(markdown).toContain("npm uninstall lodash");
+  });
+
+  it("uses pnpm commands when packageManager is pnpm", () => {
+    const { markdown } = generateMigration(
+      makeAnalysis(),
+      makeContext({ packageManager: "pnpm" }),
+      lodashTemplate
+    );
+    expect(markdown).toContain("pnpm build");
+    expect(markdown).toContain("pnpm test");
+    expect(markdown).toContain("pnpm uninstall lodash");
+  });
+
+  it("uses bun commands when packageManager is bun", () => {
+    const { markdown } = generateMigration(
+      makeAnalysis(),
+      makeContext({ packageManager: "bun" }),
+      lodashTemplate
+    );
+    expect(markdown).toContain("bun build");
+    expect(markdown).toContain("bun test");
+    expect(markdown).toContain("bun remove lodash");
   });
 
   // ─── ES target awareness ─────────────────────────────────────────────────
@@ -168,6 +190,45 @@ describe("generateMigration", () => {
     // Should still produce valid markdown with header and checklist
     expect(markdown).toContain("Migrate away from");
     expect(markdown).toContain("Verification checklist");
+  });
+
+  // ─── Default import handling ─────────────────────────────────────────────
+
+  it("generates a refactoring section for default import (not no-template fallback)", () => {
+    // Regression test: import debounce from 'lodash.debounce' → symbol is 'default'
+    // The generator previously skipped 'default' symbols, producing the generic no-template section
+    const analysis = makeAnalysis({
+      name: "lodash.debounce",
+      symbolsUsed: [
+        {
+          symbol: "default",
+          importType: "default",
+          count: 2,
+          locations: [
+            { file: "/project/src/hooks/useSearch.ts", line: 1, column: 0 },
+            { file: "/project/src/components/Input.tsx", line: 1, column: 0 },
+          ],
+        },
+      ],
+      totalSymbolsUsed: 1,
+    });
+    const template = {
+      packageName: "lodash.debounce",
+      symbols: {
+        default: {
+          symbol: "default",
+          nativeReplacement: "Custom debounce function",
+          example: "const debounce = (fn, ms) => { /* ... */ }",
+          minEcmaVersion: "ES6",
+          caveats: [],
+        },
+      },
+    };
+    const { markdown } = generateMigration(analysis, makeContext(), template);
+    // Should contain the refactoring plan, NOT the generic "no template" fallback
+    expect(markdown).toContain("Refactoring plan");
+    expect(markdown).toContain("Custom debounce function");
+    expect(markdown).not.toContain("No specific rules are defined");
   });
 
   // ─── Global caveats ──────────────────────────────────────────────────────

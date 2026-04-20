@@ -55,7 +55,7 @@ function resolveSymbolRules(
 
   for (const usage of analysis.symbolsUsed) {
     const rule = template.symbols[usage.symbol] ?? template.symbols["default"];
-    if (rule && usage.symbol !== "default") {
+    if (rule) {
       result.push({ usage, rule: { ...rule, symbol: usage.symbol } });
     }
   }
@@ -85,8 +85,8 @@ function buildMarkdown(
     sections.push(buildRefactoringPlan(resolved, context));
   }
 
-  sections.push(buildSteps(analysis));
-  sections.push(buildVerificationChecklist(analysis));
+  sections.push(buildSteps(analysis, context));
+  sections.push(buildVerificationChecklist(analysis, context));
   sections.push(buildRollback());
 
   if (template.globalCaveats?.length) {
@@ -137,7 +137,9 @@ function buildSymbolSection(
   const nativeSupported = targetSupports(context.tsconfigTarget, rule.minEcmaVersion);
   const lines: string[] = [];
 
-  lines.push(`### ${index}. Replace \`${usage.symbol}\``);
+  // "default" means the whole package was imported — show the package name as the label
+  const displaySymbol = usage.symbol === "default" ? `${rule.symbol === "default" ? "default import" : usage.symbol}` : usage.symbol;
+  lines.push(`### ${index}. Replace \`${displaySymbol}\``);
   lines.push(`**Used in ${usage.count} import${usage.count !== 1 ? "s" : ""}** across ${usage.locations.length} location${usage.locations.length !== 1 ? "s" : ""}:`);
 
   // List unique files with line numbers
@@ -207,25 +209,30 @@ No specific rules are defined for the symbols used (${symbolList}). Follow the g
 The dep-scope template library does not yet cover \`${analysis.name}\`. Consider contributing a template!`;
 }
 
-function buildSteps(analysis: DependencyAnalysis): string {
+function buildSteps(analysis: DependencyAnalysis, context: MigrationContext): string {
+  const pm = context.packageManager ?? "npm";
+  const runCmd = pm === "npm" ? "npm run" : pm;
+  const uninstallCmd = pm === "bun" ? "bun remove" : `${pm} uninstall`;
+  const branchName = `refactor/remove-${analysis.name.replace(/[^a-z0-9-]/gi, "-")}`;
+
   return `## Steps
 
 1. **Create a dedicated branch** before starting:
    \`\`\`bash
-   git checkout -b refactor/remove-${analysis.name.replace(/[^a-z0-9-]/gi, "-")}
+   git checkout -b ${branchName}
    \`\`\`
 
 2. **Work through each symbol** in the "Refactoring plan" above, one at a time.
 
 3. **After each symbol replacement**, run:
    \`\`\`bash
-   npm run build && npm test
+   ${runCmd} build && ${runCmd} test
    \`\`\`
    Fix any failures before moving to the next symbol.
 
 4. **Once all symbols are replaced**, remove the package:
    \`\`\`bash
-   npm uninstall ${analysis.name}
+   ${uninstallCmd} ${analysis.name}
    \`\`\`
 
 5. **Verify no remaining imports**:
@@ -233,19 +240,24 @@ function buildSteps(analysis: DependencyAnalysis): string {
    grep -r "from '${analysis.name}'\|from \\"${analysis.name}\\"\|require('${analysis.name}')" src/ || echo "Clean!"
    \`\`\`
 
-6. **Final build and test pass**.`;
+6. **Final build and test pass** — \`${runCmd} build && ${runCmd} test\`.`;
 }
 
-function buildVerificationChecklist(analysis: DependencyAnalysis): string {
+function buildVerificationChecklist(analysis: DependencyAnalysis, context: MigrationContext): string {
+  const pm = context.packageManager ?? "npm";
+  const runCmd = pm === "npm" ? "npm run" : pm;
+  const uninstallCmd = pm === "bun" ? "bun remove" : `${pm} uninstall`;
+  const installCmd = pm === "bun" ? "bun install" : `${pm} install`;
+
   return `## Verification checklist
 
 - [ ] Branch \`refactor/remove-${analysis.name.replace(/[^a-z0-9-]/gi, "-")}\` created
 - [ ] All \`${analysis.name}\` imports removed from source files
 - [ ] No remaining references: \`grep -r "${analysis.name}" src/\` returns nothing
-- [ ] \`npm run build\` passes with no TypeScript errors
-- [ ] \`npm test\` passes with all tests green
+- [ ] \`${runCmd} build\` passes with no TypeScript errors
+- [ ] \`${runCmd} test\` passes with all tests green
 - [ ] \`package.json\` no longer lists \`${analysis.name}\` in dependencies
-- [ ] Lockfile updated (\`npm install\` run after \`npm uninstall\`)`;
+- [ ] Lockfile updated (\`${installCmd}\` run after \`${uninstallCmd} ${analysis.name}\`)`;
 }
 
 function buildRollback(): string {

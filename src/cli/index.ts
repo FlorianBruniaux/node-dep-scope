@@ -24,6 +24,7 @@ import type { ScanResult } from "../types/index.js";
 import { generateMigration, getOrBuildTemplate } from "../migration/index.js";
 import { resolveTsConfig } from "../utils/tsconfig-resolver.js";
 import { resolveSrcPaths } from "../utils/src-paths-resolver.js";
+import { detectPackageManager } from "../utils/package-manager-detector.js";
 import type { MigrationContext } from "../migration/types.js";
 
 const VERSION = "0.2.0";
@@ -583,6 +584,7 @@ program
 
       const tsConfig = resolveTsConfig(projectPath);
       const framework = await detectFramework(projectPath);
+      const packageManager = detectPackageManager(projectPath);
       const analyzer = buildAnalyzer(config, projectPath, framework);
 
       const context: MigrationContext = {
@@ -590,6 +592,7 @@ program
         framework,
         importStyle: "barrel",
         projectPath,
+        packageManager,
       };
 
       const dryRun = options.dryRun === true;

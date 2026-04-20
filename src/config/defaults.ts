@@ -61,6 +61,7 @@ export const DEFAULT_WELL_KNOWN_PATTERNS: WellKnownPattern[] = [
   { pattern: "eslint", verdict: "IGNORE", reason: "Linter" },
   { pattern: "eslint-*", verdict: "IGNORE", reason: "ESLint plugin/config" },
   { pattern: "@eslint/*", verdict: "IGNORE", reason: "ESLint ecosystem" },
+  { pattern: "@typescript-eslint/*", verdict: "IGNORE", reason: "TypeScript ESLint (eslint config/parser)" },
   { pattern: "prettier", verdict: "IGNORE", reason: "Formatter" },
   { pattern: "prettier-*", verdict: "IGNORE", reason: "Prettier plugin" },
 
@@ -106,6 +107,24 @@ export const DEFAULT_WELL_KNOWN_PATTERNS: WellKnownPattern[] = [
   { pattern: "react-native", verdict: "KEEP", reason: "React Native runtime" },
   { pattern: "scheduler", verdict: "KEEP", reason: "React scheduler (required by react-dom)" },
   { pattern: "tslib", verdict: "KEEP", reason: "TypeScript runtime helpers" },
+
+  // Astro framework + plugins — referenced in astro.config.mjs, not TS imports
+  { pattern: "astro", verdict: "KEEP", reason: "Astro framework" },
+  { pattern: "@astrojs/*", verdict: "KEEP", reason: "Astro plugin (astro.config.mjs)" },
+
+  // Decorator / reflection packages — side-effect import only (import 'reflect-metadata')
+  { pattern: "reflect-metadata", verdict: "KEEP", reason: "Decorator reflection (NestJS/TypeORM side-effect import)" },
+
+  // Tailwind plugins — referenced in tailwind.config.*, not TS imports
+  { pattern: "daisyui", verdict: "KEEP", reason: "Tailwind plugin (tailwind.config.*)" },
+  { pattern: "@tailwindcss/typography", verdict: "KEEP", reason: "Tailwind plugin" },
+  { pattern: "@tailwindcss/forms", verdict: "KEEP", reason: "Tailwind plugin" },
+  { pattern: "@tailwindcss/aspect-ratio", verdict: "KEEP", reason: "Tailwind plugin" },
+  { pattern: "@tailwindcss/container-queries", verdict: "KEEP", reason: "Tailwind plugin" },
+
+  // Monorepo CLI tools — invoked in package.json scripts, never imported
+  { pattern: "@manypkg/*", verdict: "IGNORE", reason: "Monorepo management CLI" },
+  { pattern: "ultra-runner", verdict: "IGNORE", reason: "Monorepo task runner" },
 
   // Validation libraries - single schema file is normal
   { pattern: "zod", verdict: "KEEP", reason: "Validation library" },
