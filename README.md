@@ -801,6 +801,14 @@ Work through candidates one at a time. Never migrate two packages simultaneously
 If dep-scope is not installed: `npm install -g dep-scope` first.
 ```
 
+### Multi-project QA prompt
+
+Testing dep-scope across several projects and want a structured feedback report? Use the QA prompt in [`prompts/qa-multi-project.md`](prompts/qa-multi-project.md). It walks an AI agent through finding diverse projects on the machine, running the full command sequence, spot-checking verdicts (including barrel file re-exports and CSS reset packages), and producing a structured report with accuracy assessment, missing coverage, and improvement suggestions.
+
+```bash
+cat prompts/qa-multi-project.md | pbcopy   # copy to clipboard, then paste into Claude
+```
+
 ---
 
 ## Claude Code slash command
