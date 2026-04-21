@@ -91,6 +91,9 @@ export const depScopeConfigSchema = z.object({
   /** Auto-detect monorepo workspaces. Default: true */
   autoDetectWorkspace: z.boolean().optional(),
 
+  /** Scan transitive deps for packages with native alternatives. Default: false */
+  checkTransitive: z.boolean().optional(),
+
   // === New Options ===
 
   /**
@@ -133,6 +136,7 @@ export interface ResolvedConfig {
   output?: string;
   withKnip: boolean;
   autoDetectWorkspace: boolean;
+  checkTransitive: boolean;
   wellKnownPatterns: WellKnownPattern[];
   nativeAlternatives: CustomNativeAlternative[];
   duplicateCategories: CustomDuplicateCategory[];

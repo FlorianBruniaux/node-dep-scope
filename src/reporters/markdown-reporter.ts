@@ -96,6 +96,25 @@ export class MarkdownReporter {
       }
     }
 
+    // Transitive echoes
+    if (result.transitiveEchoes && result.transitiveEchoes.length > 0) {
+      lines.push("## Transitive Echoes");
+      lines.push("");
+      lines.push(
+        "These transitive packages have native JS alternatives. " +
+        "They cannot be removed directly — report to the upstream package or use `overrides`/`resolutions` in your package manager."
+      );
+      lines.push("");
+      lines.push("| Package | Via | Native replacement | Min ECMAScript |");
+      lines.push("|---------|-----|--------------------|----------------|");
+      for (const f of result.transitiveEchoes) {
+        lines.push(
+          `| \`${f.package}\` | \`${f.firstSeenVia}\` | ${f.nativeReplacement} | ${f.minEcmaVersion ?? "—"} |`
+        );
+      }
+      lines.push("");
+    }
+
     // Action Items - filter out INVESTIGATE if actionableOnly
     const actionItems = result.dependencies.filter((d) => {
       if (d.verdict === "KEEP") return false;

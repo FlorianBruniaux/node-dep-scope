@@ -190,6 +190,7 @@ export function resolveConfig(
     output: cliOptions.output ?? fileConfig?.output ?? extendedConfig.output ?? defaults.output,
     withKnip: cliOptions.withKnip ?? fileConfig?.withKnip ?? extendedConfig.withKnip ?? defaults.withKnip,
     autoDetectWorkspace: cliOptions.autoDetectWorkspace ?? fileConfig?.autoDetectWorkspace ?? extendedConfig.autoDetectWorkspace ?? defaults.autoDetectWorkspace,
+    checkTransitive: (cliOptions as { checkTransitive?: boolean }).checkTransitive ?? fileConfig?.checkTransitive ?? extendedConfig.checkTransitive ?? defaults.checkTransitive,
 
     // Arrays are merged, not replaced
     ignore: dedupeArray([

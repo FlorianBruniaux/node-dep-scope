@@ -445,6 +445,15 @@ export interface IPackageJsonReader {
   read(projectPath: string): Promise<PackageJsonContent>;
 
   /**
+   * Read and parse package.json from an absolute directory path.
+   * Returns null on any error (missing file, invalid JSON) instead of throwing.
+   * Used by TransitiveAnalyzer to read node_modules packages.
+   * @param absoluteDir - Absolute path to the package directory
+   * @returns Parsed package.json content or null
+   */
+  readFrom(absoluteDir: string): Promise<PackageJsonContent | null>;
+
+  /**
    * Get production dependencies
    * @param projectPath - Path to project root
    * @returns Dependencies record

@@ -1,0 +1,1 @@
+{ "name": "test-cycle", "dependencies": { "pkg-a": "^1.0.0" } }

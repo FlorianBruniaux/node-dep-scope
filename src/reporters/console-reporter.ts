@@ -9,6 +9,7 @@ import type {
   DuplicateGroup,
   InvestigateReason,
   ScanResult,
+  TransitiveEchoFinding,
   Verdict,
 } from "../types/index.js";
 import { formatCount } from "../utils/format.js";
@@ -219,6 +220,28 @@ export class ConsoleReporter {
         console.log("");
       }
     }
+  }
+
+  /**
+   * Print transitive packages with native alternatives (e18e matches)
+   */
+  printTransitiveEchoes(findings: TransitiveEchoFinding[]): void {
+    if (findings.length === 0) return;
+
+    console.log(pc.bold("Transitive echoes (reportable upstream or via overrides):"));
+    console.log("");
+
+    for (const f of findings) {
+      const via = pc.dim(`via ${f.firstSeenVia}`);
+      const ecma = f.minEcmaVersion ? pc.dim(` (${f.minEcmaVersion})`) : "";
+      console.log(
+        `  ${pc.cyan("↗")} ${f.package.padEnd(25)} ${via}`
+      );
+      console.log(
+        `      ${pc.yellow("→")} ${f.nativeReplacement}${ecma}`
+      );
+    }
+    console.log("");
   }
 
   /**

@@ -40,7 +40,7 @@ When a package gets the INVESTIGATE verdict, dep-scope shows why:
 
 ## Native Alternatives Database
 
-dep-scope flags 195 packages as having native replacements, across two sources.
+dep-scope flags 195+ packages as having native replacements, across two sources.
 
 ### Built-in (symbol-level, hand-curated)
 
@@ -121,7 +121,7 @@ dep-scope uses exit codes for CI pipelines:
 | `1` | Success, but actionable issues found |
 | `2` | Error (invalid config, missing package.json, etc.) |
 
-The following verdicts trigger exit code 1: REMOVE > 0, RECODE_NATIVE > 0, PEER_DEP > 0, duplicates found. INVESTIGATE does not trigger exit code 1.
+The following verdicts trigger exit code 1: REMOVE > 0, RECODE_NATIVE > 0, PEER_DEP > 0, duplicates found. INVESTIGATE and transitive echoes do **not** trigger exit code 1.
 
 ```bash
 dep-scope scan                  # fail if actionable issues found
@@ -140,6 +140,24 @@ dep-scope automatically filters out path aliases to avoid counting internal impo
 - TSConfig paths: custom aliases from `tsconfig.json` → `compilerOptions.paths`
 
 This prevents false positives where `@/components/Button` would incorrectly be counted as an npm package.
+
+---
+
+## Transitive Echo Detection
+
+`dep-scope scan --check-transitive` walks the full transitive dependency graph (BFS from direct deps) and reports packages that have native JS alternatives in the e18e database (169 packages).
+
+```
+Transitive echoes (reportable upstream or via overrides):
+  ↗ is-string          via lodash              → typeof x === 'string'
+  ↗ has-flag           via chalk               → process.argv.includes('--flag')
+```
+
+**Why `↗` and not `✗`**: transitive packages cannot be removed directly from `package.json`. The action is to report the issue to the upstream package maintainer or force a version via `overrides` (npm/pnpm) / `resolutions` (Yarn). These findings do **not** trigger exit code 1 — they are informational.
+
+**Supported layouts**: npm (flat), pnpm (strict + non-strict, `.pnpm/` store), Bun (same as npm). Yarn PnP is detected and skipped with a warning.
+
+**Performance**: BFS reads package.json files with caching. Typical time: ~1s for 1500 packages. The size calculation is not included (no disk I/O beyond JSON files).
 
 ---
 

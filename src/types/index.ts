@@ -122,6 +122,17 @@ export interface LibraryUsage {
   recommendation: "keep" | "migrate" | "remove";
 }
 
+export interface TransitiveEchoFinding {
+  /** Package name found as a transitive dependency */
+  package: string;
+  /** Native replacement from e18e database */
+  nativeReplacement: string;
+  /** Minimum ECMAScript version for the replacement */
+  minEcmaVersion?: string;
+  /** Direct dependency that introduced this transitive (shortest BFS path) */
+  firstSeenVia: string;
+}
+
 export interface ScanResult {
   projectPath: string;
   scannedAt: string;
@@ -140,6 +151,8 @@ export interface ScanResult {
     bundleKb: number;
     dependencyCount: number;
   };
+  /** Transitive packages with native alternatives (only present when --check-transitive) */
+  transitiveEchoes?: TransitiveEchoFinding[];
 }
 
 export interface AnalyzerOptions {

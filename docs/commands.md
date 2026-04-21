@@ -23,6 +23,7 @@ Scans all dependencies and outputs a summary with verdicts.
 | `--with-knip` | Use Knip for pre-analysis (auto-detected by default) | auto |
 | `--no-knip` | Disable Knip integration even if available | `false` |
 | `--check-duplicates` | Enable duplicate library detection | `false` |
+| `--check-transitive` | Scan transitive deps for packages with native alternatives | `false` |
 | `--actionable-only` | Show only actionable items (hide INVESTIGATE) | `false` |
 | `--no-config` | Ignore config file | `false` |
 | `--no-auto-detect` | Disable monorepo workspace auto-detection | `false` |
@@ -33,6 +34,7 @@ Scans all dependencies and outputs a summary with verdicts.
 dep-scope scan -s src lib app components
 dep-scope scan -d
 dep-scope scan --check-duplicates
+dep-scope scan --check-transitive
 dep-scope scan -f json -o ./deps.json
 dep-scope scan -p /path/to/project
 ```

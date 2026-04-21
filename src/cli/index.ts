@@ -10,6 +10,7 @@ import pc from "picocolors";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { UsageAnalyzer } from "../analyzers/usage-analyzer.js";
+import { TransitiveAnalyzer } from "../analyzers/transitive-analyzer.js";
 import { detectDuplicates } from "../rules/duplicate-categories.js";
 import { consoleReporter } from "../reporters/console-reporter.js";
 import { markdownReporter } from "../reporters/markdown-reporter.js";
@@ -26,9 +27,10 @@ import { generateMigration, getOrBuildTemplate } from "../migration/index.js";
 import { resolveTsConfig } from "../utils/tsconfig-resolver.js";
 import { resolveSrcPaths } from "../utils/src-paths-resolver.js";
 import { detectPackageManager } from "../utils/package-manager-detector.js";
+import { PackageJsonReader } from "../utils/package-json-reader.js";
 import type { MigrationContext } from "../migration/types.js";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 
 const VALID_FORMATS = ["console", "markdown", "json"] as const;
 type Format = (typeof VALID_FORMATS)[number];
@@ -161,6 +163,7 @@ program
   .option("--no-knip", "Disable Knip integration even if available")
   .option("--actionable-only", "Show only actionable items (hide INVESTIGATE)")
   .option("--check-duplicates", "Check for duplicate libraries (off by default)")
+  .option("--check-transitive", "Scan transitive deps for packages with native alternatives")
   .option("--no-config", "Ignore config file")
   .option("--no-exit-code", "Always exit with code 0 (for CI debugging)")
   .option("--no-auto-detect", "Disable monorepo workspace auto-detection")
@@ -268,6 +271,23 @@ program
           dependencies.filter((d) => d.verdict === "REMOVE").length,
       };
 
+      // Transitive echo analysis (opt-in)
+      let transitiveEchoes: import("../types/index.js").TransitiveEchoFinding[] | undefined;
+      if (options.checkTransitive) {
+        try {
+          const pkgJson = await new PackageJsonReader().read(projectPath);
+          const directDepNames = Object.keys({
+            ...pkgJson.dependencies,
+            ...(config.includeDev ? pkgJson.devDependencies : {}),
+          });
+          transitiveEchoes = await new TransitiveAnalyzer().analyze(projectPath, directDepNames);
+        } catch (err) {
+          console.warn(
+            `  [dep-scope] Transitive analysis failed: ${err instanceof Error ? err.message : err}`
+          );
+        }
+      }
+
       const result: ScanResult = {
         projectPath,
         scannedAt: new Date().toISOString(),
@@ -275,6 +295,7 @@ program
         duplicates,
         summary,
         estimatedSavings,
+        ...(transitiveEchoes !== undefined && { transitiveEchoes }),
       };
 
       // Output
@@ -282,6 +303,9 @@ program
 
       if ((format ?? "console") === "console") {
         printNextSteps(result);
+        if (result.transitiveEchoes && result.transitiveEchoes.length > 0) {
+          consoleReporter.printTransitiveEchoes(result.transitiveEchoes);
+        }
       }
 
       // Exit with appropriate code for CI

@@ -70,8 +70,11 @@ export default defineConfig({
 | `verbose` | boolean | `false` | Verbose output (shows resolved paths, warnings) |
 | `fileCountThreshold` | number | `3` | Minimum file count to auto-KEEP (skip INVESTIGATE) |
 | `autoDetectWorkspace` | boolean | `true` | Auto-detect monorepo workspaces |
+| `checkTransitive` | boolean | `false` | Scan transitive deps for packages with native alternatives |
 
-The following directories are always excluded from scanning: `node_modules`, `dist`, `.next`, `coverage`.
+The following directories are always excluded from scanning: `node_modules`, `dist`, `.next`, `coverage`, `build`, `out`, `.nuxt`, `.svelte-kit`, `.turbo`, `storybook-static`.
+
+> **Most common cause of inaccurate results**: the `srcPaths` option. If dep-scope prints `No standard source directories found — scanning from project root`, configure `srcPaths` explicitly — all verdicts are unreliable until then. Example for a NestJS + React Router project: `{ "srcPaths": ["src", "server", "client", "app"] }`.
 
 ## Presets
 
@@ -112,12 +115,21 @@ Automatically assign KEEP or IGNORE verdicts to packages matching patterns:
 }
 ```
 
-**Built-in patterns (120+, always applied):**
+**Built-in patterns (180+, always applied):**
 
 - `@radix-ui/*`, `@headlessui/*`, `@chakra-ui/*` → KEEP (UI libraries)
 - `@tanstack/*`, `react-hook-form`, `zustand` → KEEP (React ecosystem)
+- `@nestjs/*`, `fastify`, `@fastify/*` → KEEP (Node.js frameworks)
+- `@react-router/*`, `react-router` → KEEP (React Router v7)
 - `zod`, `valibot`, `yup` → KEEP (Validation)
-- `@prisma/client`, `drizzle-orm` → KEEP (ORMs)
+- `@prisma/client`, `drizzle-orm`, `typeorm`, `sequelize` → KEEP (ORMs)
+- `winston`, `pino`, `bunyan` → KEEP (Loggers, singleton pattern)
+- `nodemailer`, `resend`, `@sendgrid/*` → KEEP (Email services)
+- `rxjs` → KEEP (Reactive extensions, used by NestJS)
+- `@anthropic-ai/*`, `@google/genai`, `@azure/openai` → KEEP (AI SDKs)
+- `@workos-inc/*`, `@infisical/*` → KEEP (Auth/secrets, single init file)
+- `cookie-parser`, `cors`, `helmet`, `isbot` → KEEP (HTTP middleware)
+- `dompurify` → KEEP (HTML sanitization)
 - `@types/*`, `eslint*`, `prettier`, `vitest`, `jest` → IGNORE (Dev tools)
 - `tailwindcss`, `postcss`, `autoprefixer` → IGNORE (CSS tooling)
 - `vite`, `webpack`, `esbuild`, `rollup` → IGNORE (Bundlers)

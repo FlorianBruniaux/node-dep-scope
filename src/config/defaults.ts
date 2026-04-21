@@ -239,6 +239,82 @@ export const DEFAULT_WELL_KNOWN_PATTERNS: WellKnownPattern[] = [
   // Streaming utilities
   { pattern: "resumable-stream", verdict: "KEEP", reason: "Stream utilities" },
   { pattern: "eventsource-parser", verdict: "KEEP", reason: "SSE parsing" },
+
+  // NestJS framework - low spread is normal (modules, decorators, single service file)
+  { pattern: "@nestjs/*", verdict: "KEEP", reason: "NestJS framework" },
+  { pattern: "nestjs-*", verdict: "KEEP", reason: "NestJS ecosystem" },
+
+  // React Router v7 - framework packages with low spread by design
+  { pattern: "@react-router/*", verdict: "KEEP", reason: "React Router v7 framework" },
+  { pattern: "react-router", verdict: "KEEP", reason: "React Router" },
+
+  // Fastify ecosystem - plugins registered once in app bootstrap
+  { pattern: "@fastify/*", verdict: "KEEP", reason: "Fastify plugin (single registration)" },
+  { pattern: "fastify-*", verdict: "KEEP", reason: "Fastify plugin" },
+  { pattern: "fastify", verdict: "KEEP", reason: "Fastify framework" },
+
+  // Logger - singleton pattern, low spread is normal
+  { pattern: "winston", verdict: "KEEP", reason: "Logger (singleton pattern)" },
+  { pattern: "pino", verdict: "KEEP", reason: "Logger (singleton pattern)" },
+  { pattern: "pino-*", verdict: "KEEP", reason: "Pino logger ecosystem" },
+  { pattern: "bunyan", verdict: "KEEP", reason: "Logger (singleton pattern)" },
+
+  // Email - single service file is normal
+  { pattern: "nodemailer", verdict: "KEEP", reason: "Email service (single setup file)" },
+  { pattern: "@sendgrid/*", verdict: "KEEP", reason: "Email service" },
+  { pattern: "resend", verdict: "KEEP", reason: "Email service" },
+
+  // RxJS - used by NestJS internally + observable pattern
+  { pattern: "rxjs", verdict: "KEEP", reason: "Reactive extensions (NestJS + observable pattern)" },
+
+  // HTTP middleware - single registration in app bootstrap
+  { pattern: "cookie-parser", verdict: "KEEP", reason: "Express/Fastify middleware (single registration)" },
+  { pattern: "http-proxy-middleware", verdict: "KEEP", reason: "Proxy middleware (single registration)" },
+  { pattern: "cors", verdict: "KEEP", reason: "CORS middleware (single registration)" },
+  { pattern: "helmet", verdict: "KEEP", reason: "Security middleware (single registration)" },
+  { pattern: "compression", verdict: "KEEP", reason: "Compression middleware (single registration)" },
+  { pattern: "morgan", verdict: "KEEP", reason: "HTTP logger middleware (single registration)" },
+
+  // Bot detection / request utilities - single middleware usage
+  { pattern: "isbot", verdict: "KEEP", reason: "Bot detection (single middleware)" },
+
+  // AI SDKs - single provider file is normal
+  { pattern: "@anthropic-ai/*", verdict: "KEEP", reason: "Anthropic AI SDK (single provider file)" },
+  { pattern: "@google/genai", verdict: "KEEP", reason: "Google AI SDK (single provider file)" },
+  { pattern: "@azure/openai", verdict: "KEEP", reason: "Azure OpenAI SDK (single provider file)" },
+  { pattern: "@mistralai/*", verdict: "KEEP", reason: "Mistral AI SDK (single provider file)" },
+  { pattern: "@cohere-ai/*", verdict: "KEEP", reason: "Cohere AI SDK (single provider file)" },
+
+  // Auth providers - single provider/middleware file
+  { pattern: "@workos-inc/*", verdict: "KEEP", reason: "WorkOS auth (single provider file)" },
+  { pattern: "@casl/*", verdict: "KEEP", reason: "Authorization library" },
+  { pattern: "casbin", verdict: "KEEP", reason: "Authorization library" },
+
+  // Secrets/Config - single init file
+  { pattern: "@infisical/*", verdict: "KEEP", reason: "Secrets manager (single init file)" },
+  { pattern: "@dopplerhq/*", verdict: "KEEP", reason: "Secrets manager (single init file)" },
+
+  // CRM/Support - single integration file
+  { pattern: "crisp-api", verdict: "KEEP", reason: "CRM API (single integration file)" },
+  { pattern: "@intercom/*", verdict: "KEEP", reason: "CRM (single integration)" },
+
+  // ORM/DB frameworks
+  { pattern: "typeorm", verdict: "KEEP", reason: "TypeORM framework" },
+  { pattern: "typeorm-*", verdict: "KEEP", reason: "TypeORM ecosystem" },
+  { pattern: "mikro-orm", verdict: "KEEP", reason: "MikroORM framework" },
+  { pattern: "@mikro-orm/*", verdict: "KEEP", reason: "MikroORM ecosystem" },
+  { pattern: "sequelize", verdict: "KEEP", reason: "Sequelize ORM" },
+  { pattern: "sequelize-*", verdict: "KEEP", reason: "Sequelize ecosystem" },
+
+  // CLI / terminal utilities - single usage is normal
+  { pattern: "log-update", verdict: "KEEP", reason: "CLI progress output (single usage)" },
+  { pattern: "ora", verdict: "KEEP", reason: "CLI spinner (single usage)" },
+  { pattern: "chalk", verdict: "KEEP", reason: "Terminal colors" },
+  { pattern: "open", verdict: "KEEP", reason: "Open URLs/files (single usage)" },
+
+  // Sanitization - typically one wrapper util
+  { pattern: "dompurify", verdict: "KEEP", reason: "HTML sanitization (single utility wrapper)" },
+  { pattern: "isomorphic-dompurify", verdict: "KEEP", reason: "HTML sanitization (SSR)" },
 ];
 
 /**
@@ -272,6 +348,7 @@ export function getDefaults(): ResolvedConfig {
     output: undefined,
     withKnip: false,
     autoDetectWorkspace: true,
+    checkTransitive: false,
     wellKnownPatterns: DEFAULT_WELL_KNOWN_PATTERNS,
     nativeAlternatives: [],
     duplicateCategories: [],

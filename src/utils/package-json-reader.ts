@@ -82,6 +82,26 @@ export class PackageJsonReader implements IPackageJsonReader {
   }
 
   /**
+   * Read package.json from an absolute directory path, returning null on failure.
+   * Used for node_modules traversal where missing packages are expected.
+   */
+  async readFrom(absoluteDir: string): Promise<PackageJsonContent | null> {
+    const cacheKey = absoluteDir;
+    if (this.cache.has(cacheKey)) {
+      return this.cache.get(cacheKey) ?? null;
+    }
+    const pkgPath = path.join(absoluteDir, "package.json");
+    try {
+      const content = await this.fileSystem.readFile(pkgPath, "utf-8");
+      const parsed = JSON.parse(content) as PackageJsonContent;
+      this.cache.set(cacheKey, parsed);
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Get production dependencies from package.json
    */
   async getDependencies(projectPath: string): Promise<Record<string, string>> {
