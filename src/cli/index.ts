@@ -30,7 +30,7 @@ import { detectPackageManager } from "../utils/package-manager-detector.js";
 import { PackageJsonReader } from "../utils/package-json-reader.js";
 import type { MigrationContext } from "../migration/types.js";
 
-const VERSION = "0.3.0";
+const VERSION = "0.3.1";
 
 const VALID_FORMATS = ["console", "markdown", "json"] as const;
 type Format = (typeof VALID_FORMATS)[number];
