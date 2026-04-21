@@ -190,7 +190,7 @@ export class ConsoleReporter {
     // Recode
     const toRecode = actionItems.filter((d) => d.verdict === "RECODE_NATIVE");
     if (toRecode.length > 0) {
-      console.log(`  ${pc.yellow("Recode to native:")}`);
+      console.log(`  ${pc.yellow("Replace with built-in JS (no npm needed):")}`);
       for (const dep of toRecode) {
         const symbols = dep.symbolsUsed
           .slice(0, 3)

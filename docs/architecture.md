@@ -5,7 +5,7 @@
 | Verdict | Symbol | Meaning |
 |---------|--------|---------|
 | KEEP | ✓ | Well-used, no action needed |
-| RECODE_NATIVE | ↻ | Few symbols used, native alternatives available |
+| RECODE_NATIVE | ↻ | Few symbols used, replaceable with built-in JS (no npm needed) |
 | CONSOLIDATE | ⇄ | Duplicate with another library |
 | REMOVE | ✗ | Unused (0 imports found) |
 | PEER_DEP | ⊕ | Required by other packages, redundant in package.json |
@@ -15,7 +15,7 @@
 
 - **REMOVE**: No imports detected in source files
 - **PEER_DEP**: No direct imports, but required by other installed packages
-- **RECODE_NATIVE**: Less than `threshold` symbols used AND native alternatives exist (built-in DB or e18e)
+- **RECODE_NATIVE**: Less than `threshold` symbols used AND built-in JS equivalents exist — e.g. `cloneDeep` → `structuredClone()`, `uuid.v4` → `crypto.randomUUID()`, `is-string` → `typeof x === 'string'`. No npm package needed.
 - **CONSOLIDATE**: Multiple libraries from same category detected (e.g., lucide-react + react-icons)
 - **INVESTIGATE**: Low usage but no clear alternative (with reason)
 - **KEEP**: Significant usage, no issues
