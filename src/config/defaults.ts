@@ -145,6 +145,12 @@ export const DEFAULT_WELL_KNOWN_PATTERNS: WellKnownPattern[] = [
   { pattern: "@clerk/*", verdict: "KEEP", reason: "Clerk auth (provider pattern)" },
   { pattern: "@auth/*", verdict: "KEEP", reason: "Auth.js ecosystem" },
   { pattern: "lucia", verdict: "KEEP", reason: "Lucia auth" },
+  { pattern: "@auth0/*", verdict: "KEEP", reason: "Auth0 SDK (single provider)" },
+  { pattern: "@okta/*", verdict: "KEEP", reason: "Okta SDK (single init)" },
+  { pattern: "@stytch/*", verdict: "KEEP", reason: "Stytch auth SDK (single client)" },
+  { pattern: "@descope/*", verdict: "KEEP", reason: "Descope auth SDK (single client)" },
+  { pattern: "firebase", verdict: "KEEP", reason: "Firebase SDK (single app init)" },
+  { pattern: "@firebase/*", verdict: "KEEP", reason: "Firebase modular SDK" },
 
   // Editor libraries - single editor component is normal
   { pattern: "@codemirror/*", verdict: "KEEP", reason: "CodeMirror (editor component)" },
@@ -192,11 +198,17 @@ export const DEFAULT_WELL_KNOWN_PATTERNS: WellKnownPattern[] = [
   // Background jobs/Cron - single setup file
   { pattern: "node-cron", verdict: "KEEP", reason: "Cron scheduler" },
   { pattern: "bullmq", verdict: "KEEP", reason: "Job queue" },
+  { pattern: "bull", verdict: "KEEP", reason: "Job queue (single queue instance)" },
   { pattern: "agenda", verdict: "KEEP", reason: "Job scheduler" },
+  { pattern: "inngest", verdict: "KEEP", reason: "Inngest background jobs (single client)" },
+  { pattern: "@trigger.dev/*", verdict: "KEEP", reason: "Trigger.dev workflow SDK (single client)" },
 
   // Payment - single server instance + single client init
   { pattern: "stripe", verdict: "KEEP", reason: "Stripe server SDK (single instance)" },
   { pattern: "@stripe/*", verdict: "KEEP", reason: "Stripe SDK (single init file)" },
+  { pattern: "squareup", verdict: "KEEP", reason: "Square payment SDK (single client)" },
+  { pattern: "@paypal/*", verdict: "KEEP", reason: "PayPal SDK (single client)" },
+  { pattern: "@paddle/*", verdict: "KEEP", reason: "Paddle payment SDK (single client)" },
 
   // Realtime/WebSocket - single connection setup per side
   { pattern: "pusher", verdict: "KEEP", reason: "Pusher server SDK (single connection)" },
@@ -205,16 +217,26 @@ export const DEFAULT_WELL_KNOWN_PATTERNS: WellKnownPattern[] = [
   { pattern: "socket.io", verdict: "KEEP", reason: "Socket.io server (single setup)" },
   { pattern: "socket.io-client", verdict: "KEEP", reason: "Socket.io client (single connection)" },
   { pattern: "ws", verdict: "KEEP", reason: "WebSocket (single server setup)" },
+  { pattern: "@liveblocks/*", verdict: "KEEP", reason: "Liveblocks realtime (single provider)" },
+  { pattern: "partykit", verdict: "KEEP", reason: "PartyKit realtime (single server)" },
 
   // Notification/Messaging services - single provider init
   { pattern: "@knocklabs/*", verdict: "KEEP", reason: "Knock notification SDK (single provider)" },
   { pattern: "@novu/*", verdict: "KEEP", reason: "Novu notification SDK (single provider)" },
   { pattern: "twilio", verdict: "KEEP", reason: "Twilio SDK (single client)" },
+  { pattern: "mailgun.js", verdict: "KEEP", reason: "Mailgun SDK (single init)" },
+  { pattern: "postmark", verdict: "KEEP", reason: "Postmark email SDK (single client)" },
+  { pattern: "@mailchimp/*", verdict: "KEEP", reason: "Mailchimp SDK (single init)" },
 
   // Third-party API clients - single integration file
   { pattern: "@notionhq/*", verdict: "KEEP", reason: "Notion API client (single integration file)" },
   { pattern: "@airtable/*", verdict: "KEEP", reason: "Airtable client (single integration file)" },
   { pattern: "airtable", verdict: "KEEP", reason: "Airtable client (single integration file)" },
+  { pattern: "@linear/sdk", verdict: "KEEP", reason: "Linear API client (single integration)" },
+  { pattern: "octokit", verdict: "KEEP", reason: "GitHub API client (single init)" },
+  { pattern: "@octokit/*", verdict: "KEEP", reason: "Octokit ecosystem" },
+  { pattern: "@supabase/*", verdict: "KEEP", reason: "Supabase SDK (single client)" },
+  { pattern: "replicate", verdict: "KEEP", reason: "Replicate AI SDK (single client)" },
 
   // Analytics/Monitoring - single init
   { pattern: "@sentry/*", verdict: "KEEP", reason: "Sentry (single instrumentation file)" },
@@ -223,6 +245,56 @@ export const DEFAULT_WELL_KNOWN_PATTERNS: WellKnownPattern[] = [
   { pattern: "@posthog/*", verdict: "KEEP", reason: "PostHog SDK" },
   { pattern: "@segment/*", verdict: "KEEP", reason: "Segment analytics (single init)" },
   { pattern: "mixpanel", verdict: "KEEP", reason: "Mixpanel analytics (single init)" },
+  { pattern: "mixpanel-browser", verdict: "KEEP", reason: "Mixpanel browser SDK (single init)" },
+  { pattern: "@amplitude/*", verdict: "KEEP", reason: "Amplitude analytics (single init)" },
+  { pattern: "dd-trace", verdict: "KEEP", reason: "Datadog APM tracer (single init)" },
+  { pattern: "newrelic", verdict: "KEEP", reason: "New Relic agent (single require)" },
+  { pattern: "@opentelemetry/*", verdict: "KEEP", reason: "OpenTelemetry instrumentation (single setup)" },
+
+  // Feature flags - single SDK init
+  { pattern: "@growthbook/*", verdict: "KEEP", reason: "GrowthBook feature flags (single SDK init)" },
+  { pattern: "growthbook", verdict: "KEEP", reason: "GrowthBook feature flags" },
+  { pattern: "@launchdarkly/*", verdict: "KEEP", reason: "LaunchDarkly feature flags (single client)" },
+  { pattern: "launchdarkly-*", verdict: "KEEP", reason: "LaunchDarkly SDK" },
+  { pattern: "flagsmith", verdict: "KEEP", reason: "Flagsmith feature flags (single init)" },
+  { pattern: "unleash-client", verdict: "KEEP", reason: "Unleash feature flags (single client)" },
+  { pattern: "@statsig/*", verdict: "KEEP", reason: "Statsig feature flags (single init)" },
+
+  // Search - single client init
+  { pattern: "algoliasearch", verdict: "KEEP", reason: "Algolia search client (single init)" },
+  { pattern: "@algolia/*", verdict: "KEEP", reason: "Algolia ecosystem" },
+  { pattern: "typesense", verdict: "KEEP", reason: "Typesense search client (single init)" },
+  { pattern: "meilisearch", verdict: "KEEP", reason: "MeiliSearch client (single init)" },
+  { pattern: "@elastic/elasticsearch", verdict: "KEEP", reason: "Elasticsearch client (single init)" },
+  { pattern: "@elastic/*", verdict: "KEEP", reason: "Elastic ecosystem" },
+
+  // CMS clients - single init + fetch pattern
+  { pattern: "@sanity/client", verdict: "KEEP", reason: "Sanity CMS client (single init)" },
+  { pattern: "@sanity/*", verdict: "KEEP", reason: "Sanity CMS ecosystem" },
+  { pattern: "contentful", verdict: "KEEP", reason: "Contentful CMS client (single init)" },
+  { pattern: "@contentful/*", verdict: "KEEP", reason: "Contentful ecosystem" },
+  { pattern: "@storyblok/*", verdict: "KEEP", reason: "Storyblok CMS client (single init)" },
+  { pattern: "@prismicio/*", verdict: "KEEP", reason: "Prismic CMS client (single init)" },
+  { pattern: "tinacms", verdict: "KEEP", reason: "TinaCMS (single config)" },
+  { pattern: "@tinacms/*", verdict: "KEEP", reason: "TinaCMS ecosystem" },
+
+  // File storage/CDN - single client per service
+  { pattern: "@aws-sdk/*", verdict: "KEEP", reason: "AWS SDK v3 (single client per service)" },
+  { pattern: "aws-sdk", verdict: "KEEP", reason: "AWS SDK v2 (single instance)" },
+  { pattern: "cloudinary", verdict: "KEEP", reason: "Cloudinary SDK (single init)" },
+  { pattern: "@cloudinary/*", verdict: "KEEP", reason: "Cloudinary ecosystem" },
+  { pattern: "uploadthing", verdict: "KEEP", reason: "Uploadthing file uploads (single router)" },
+  { pattern: "@uploadthing/*", verdict: "KEEP", reason: "Uploadthing ecosystem" },
+
+  // Web3/Blockchain - single provider or wallet init
+  { pattern: "viem", verdict: "KEEP", reason: "Viem Ethereum client (single init)" },
+  { pattern: "ethers", verdict: "KEEP", reason: "Ethers.js Ethereum library (single provider)" },
+  { pattern: "wagmi", verdict: "KEEP", reason: "Wagmi React hooks for Web3 (single provider)" },
+  { pattern: "@rainbow-me/*", verdict: "KEEP", reason: "RainbowKit wallet UI (single provider)" },
+  { pattern: "web3", verdict: "KEEP", reason: "Web3.js Ethereum library (single instance)" },
+  { pattern: "@privy-io/*", verdict: "KEEP", reason: "Privy embedded wallet (single provider)" },
+  { pattern: "@thirdweb-dev/*", verdict: "KEEP", reason: "Thirdweb Web3 SDK" },
+  { pattern: "thirdweb", verdict: "KEEP", reason: "Thirdweb Web3 SDK" },
 
   // Misc specialized libraries
   { pattern: "dataloader", verdict: "KEEP", reason: "Data batching (single setup)" },
