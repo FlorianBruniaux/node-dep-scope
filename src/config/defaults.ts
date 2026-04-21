@@ -296,6 +296,27 @@ export const DEFAULT_WELL_KNOWN_PATTERNS: WellKnownPattern[] = [
   { pattern: "@thirdweb-dev/*", verdict: "KEEP", reason: "Thirdweb Web3 SDK" },
   { pattern: "thirdweb", verdict: "KEEP", reason: "Thirdweb Web3 SDK" },
 
+  // HTTP frameworks - single app init
+  { pattern: "express", verdict: "KEEP", reason: "Express server (single app init)" },
+  { pattern: "express-*", verdict: "KEEP", reason: "Express middleware" },
+  { pattern: "hono", verdict: "KEEP", reason: "Hono framework (single app init)" },
+  { pattern: "@hono/*", verdict: "KEEP", reason: "Hono ecosystem" },
+  { pattern: "koa", verdict: "KEEP", reason: "Koa server (single app init)" },
+  { pattern: "koa-*", verdict: "KEEP", reason: "Koa middleware" },
+
+  // Serialization/utility — low spread is expected by design
+  { pattern: "superjson", verdict: "KEEP", reason: "Serialization (single config point)" },
+  { pattern: "http-status-codes", verdict: "KEEP", reason: "HTTP constants (low spread is normal)" },
+  { pattern: "http-status", verdict: "KEEP", reason: "HTTP constants" },
+
+  // Dev CLI tools — run via scripts, not imported
+  { pattern: "prisma", verdict: "IGNORE", reason: "Prisma CLI (migration runner, not imported — use @prisma/client for the client)" },
+  { pattern: "tsx", verdict: "IGNORE", reason: "TypeScript executor (dev CLI, not imported)" },
+  { pattern: "ts-node", verdict: "IGNORE", reason: "TypeScript executor (dev CLI, not imported)" },
+  { pattern: "zod-prisma-types", verdict: "IGNORE", reason: "Prisma generator (runs at build time, not imported)" },
+  { pattern: "prisma-*", verdict: "IGNORE", reason: "Prisma generator/plugin (build-time tool)" },
+  { pattern: "*-prisma-*", verdict: "IGNORE", reason: "Prisma generator/plugin (build-time tool)" },
+
   // Misc specialized libraries
   { pattern: "dataloader", verdict: "KEEP", reason: "Data batching (single setup)" },
   { pattern: "svix", verdict: "KEEP", reason: "Webhook service" },

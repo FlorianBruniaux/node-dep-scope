@@ -45,6 +45,7 @@ const VERDICT_SYMBOL: Record<Verdict, string> = {
 
 export interface ReporterOptions {
   actionableOnly?: boolean;
+  skipHeader?: boolean;
 }
 
 export class ConsoleReporter {
@@ -52,15 +53,17 @@ export class ConsoleReporter {
    * Print scan summary
    */
   printScanSummary(result: ScanResult, options: ReporterOptions = {}): void {
-    const { actionableOnly } = options;
+    const { actionableOnly, skipHeader } = options;
 
-    console.log("");
-    console.log(pc.bold("═══════════════════════════════════════════"));
-    console.log(pc.bold("  dep-scope Analysis Report"));
-    if (actionableOnly) {
-      console.log(pc.dim("  (actionable items only)"));
+    if (!skipHeader) {
+      console.log("");
+      console.log(pc.bold("═══════════════════════════════════════════"));
+      console.log(pc.bold("  dep-scope Analysis Report"));
+      if (actionableOnly) {
+        console.log(pc.dim("  (actionable items only)"));
+      }
+      console.log(pc.bold("═══════════════════════════════════════════"));
     }
-    console.log(pc.bold("═══════════════════════════════════════════"));
     console.log("");
 
     // Summary counts

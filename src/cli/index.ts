@@ -31,7 +31,7 @@ import { PackageJsonReader } from "../utils/package-json-reader.js";
 import { detectWorkspace } from "../utils/workspace-detector.js";
 import type { MigrationContext } from "../migration/types.js";
 
-const VERSION = "0.3.5";
+const VERSION = "0.3.6";
 
 const VALID_FORMATS = ["console", "markdown", "json"] as const;
 type Format = (typeof VALID_FORMATS)[number];
@@ -281,7 +281,7 @@ program
           console.log(pc.bold("═".repeat(43)));
           console.log(pc.bold(`  ${pc.cyan(pkgRelDir)}`));
           console.log(pc.bold("═".repeat(43)));
-          consoleReporter.printScanSummary(pkgResult, { actionableOnly: options.actionableOnly });
+          consoleReporter.printScanSummary(pkgResult, { actionableOnly: options.actionableOnly, skipHeader: true });
           consoleReporter.printDuplicates(pkgResult.duplicates);
           consoleReporter.printActionItems(pkgResult.dependencies, { actionableOnly: options.actionableOnly });
           printNextSteps(pkgResult);
