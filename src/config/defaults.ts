@@ -162,11 +162,19 @@ export const DEFAULT_WELL_KNOWN_PATTERNS: WellKnownPattern[] = [
   // Database/Cache - single connection file is normal
   { pattern: "redis", verdict: "KEEP", reason: "Redis client (single connection)" },
   { pattern: "ioredis", verdict: "KEEP", reason: "Redis client" },
+  { pattern: "@upstash/redis", verdict: "KEEP", reason: "Upstash Redis client (single connection file)" },
+  { pattern: "@upstash/ratelimit", verdict: "KEEP", reason: "Upstash rate limiter (single setup file)" },
+  { pattern: "@upstash/*", verdict: "KEEP", reason: "Upstash SDK (single init file)" },
   { pattern: "pg", verdict: "KEEP", reason: "PostgreSQL client" },
+  { pattern: "@neondatabase/*", verdict: "KEEP", reason: "Neon serverless PostgreSQL driver" },
   { pattern: "mysql2", verdict: "KEEP", reason: "MySQL client" },
   { pattern: "mongodb", verdict: "KEEP", reason: "MongoDB client" },
   { pattern: "mongoose", verdict: "KEEP", reason: "MongoDB ODM" },
   { pattern: "pgvector", verdict: "KEEP", reason: "Postgres vector" },
+  { pattern: "@prisma/*", verdict: "KEEP", reason: "Prisma adapter/extension (single setup file)" },
+  { pattern: "@libsql/*", verdict: "KEEP", reason: "Turso/libSQL client" },
+  { pattern: "libsql", verdict: "KEEP", reason: "Turso/libSQL client" },
+  { pattern: "@planetscale/*", verdict: "KEEP", reason: "PlanetScale driver" },
 
   // UI primitives - single component usage is normal
   { pattern: "cmdk", verdict: "KEEP", reason: "Command menu (single component)" },
