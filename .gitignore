@@ -1,5 +1,7 @@
 # Dependencies
 node_modules/
+!tests/fixtures/**/node_modules/
+!tests/fixtures/**/node_modules/**
 
 # Build output
 dist/

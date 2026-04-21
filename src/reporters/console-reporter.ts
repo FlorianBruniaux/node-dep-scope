@@ -242,6 +242,24 @@ export class ConsoleReporter {
       );
     }
     console.log("");
+    console.log(pc.dim("These packages cannot be removed from your package.json directly."));
+    console.log(pc.dim("Next steps:"));
+    console.log(pc.dim("  1. Report to upstream — open an issue or link to https://e18e.dev"));
+    console.log(pc.dim('  2. Force a version via overrides (npm/pnpm) or resolutions (Yarn):'));
+    console.log("");
+    console.log(pc.dim('     # package.json'));
+    console.log(pc.dim('     "overrides": {'));
+    const shown = findings.slice(0, 3);
+    for (const f of shown) {
+      console.log(pc.dim(`       "${f.package}": "npm:${f.package}@*"  # pin to a patched fork`));
+    }
+    if (findings.length > 3) {
+      console.log(pc.dim(`       # ... and ${findings.length - 3} more`));
+    }
+    console.log(pc.dim('     }'));
+    console.log("");
+    console.log(pc.dim("  dep-scope analyze <package>  — deep-dive any direct dep to see which transitives it pulls"));
+    console.log("");
   }
 
   /**

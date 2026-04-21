@@ -36,6 +36,8 @@ export class TransitiveAnalyzer {
     projectPath: string,
     directDeps: string[]
   ): Promise<TransitiveEchoFinding[]> {
+    if (directDeps.length === 0) return [];
+
     const nodeModulesPath = path.join(projectPath, "node_modules");
 
     // Guard: Yarn PnP detection — check before node_modules existence
