@@ -28,9 +28,10 @@ import { resolveTsConfig } from "../utils/tsconfig-resolver.js";
 import { resolveSrcPaths } from "../utils/src-paths-resolver.js";
 import { detectPackageManager } from "../utils/package-manager-detector.js";
 import { PackageJsonReader } from "../utils/package-json-reader.js";
+import { detectWorkspace } from "../utils/workspace-detector.js";
 import type { MigrationContext } from "../migration/types.js";
 
-const VERSION = "0.3.4";
+const VERSION = "0.3.5";
 
 const VALID_FORMATS = ["console", "markdown", "json"] as const;
 type Format = (typeof VALID_FORMATS)[number];
@@ -164,6 +165,7 @@ program
   .option("--actionable-only", "Show only actionable items (hide INVESTIGATE)")
   .option("--check-duplicates", "Check for duplicate libraries (off by default)")
   .option("--check-transitive", "Scan transitive deps for packages with native alternatives")
+  .option("--each-workspace", "Scan each workspace package individually (monorepo mode)")
   .option("--no-config", "Ignore config file")
   .option("--no-exit-code", "Always exit with code 0 (for CI debugging)")
   .option("--no-auto-detect", "Disable monorepo workspace auto-detection")
@@ -206,6 +208,116 @@ program
 
       // autoDetect is false when --no-auto-detect is used
       const autoDetectWorkspace = options.autoDetect !== false;
+
+      // ── Workspace mode: scan each package individually ──────────────────
+      if (options.eachWorkspace) {
+        const workspace = await detectWorkspace(projectPath);
+
+        if (workspace.packages.length === 0) {
+          console.log(pc.yellow(
+            "No workspace packages found. Run without --each-workspace for a single project scan."
+          ));
+          return;
+        }
+
+        console.log(pc.dim(`Workspace detected (${workspace.type}): ${workspace.packages.length} packages\n`));
+
+        const allResults: ScanResult[] = [];
+        let hasAnyIssues = false;
+
+        for (const pkgRelDir of workspace.packages) {
+          const pkgPath = path.join(projectPath, pkgRelDir);
+
+          // Skip if no package.json
+          try { await fs.access(path.join(pkgPath, "package.json")); } catch { continue; }
+
+          const pkgSrcPaths = resolveSrcPaths(pkgPath, config.srcPaths);
+          const pkgAnalyzer = new UsageAnalyzer({
+            srcPaths: pkgSrcPaths,
+            threshold: config.threshold,
+            fileCountThreshold: config.fileCountThreshold,
+            includeDev: config.includeDev,
+            ignore: config.ignore,
+            verbose: false,
+            withKnip: false,
+            autoDetectWorkspace: false,
+            wellKnownPatterns: config.wellKnownPatterns,
+            nativeAlternatives: config.nativeAlternatives,
+            duplicateCategories: config.duplicateCategories,
+          });
+
+          const deps = await pkgAnalyzer.scanProject(pkgPath);
+          if (deps.length === 0) continue;
+
+          const dups = options.checkDuplicates ? detectDuplicates(deps, config.duplicateCategories) : [];
+          const pkgSummary = {
+            total: deps.length,
+            keep: deps.filter((d) => d.verdict === "KEEP").length,
+            recodeNative: deps.filter((d) => d.verdict === "RECODE_NATIVE").length,
+            consolidate: dups.reduce((acc, g) => acc + g.libraries.filter((l) => l.recommendation === "migrate").length, 0),
+            remove: deps.filter((d) => d.verdict === "REMOVE").length,
+            peerDep: deps.filter((d) => d.verdict === "PEER_DEP").length,
+            investigate: deps.filter((d) => d.verdict === "INVESTIGATE").length,
+          };
+          const pkgSavings = {
+            bundleKb: dups.reduce((acc, g) => acc + g.potentialSavings.bundleKb, 0) +
+              deps.filter((d) => d.verdict === "RECODE_NATIVE" || d.verdict === "REMOVE").length * 5,
+            dependencyCount: dups.reduce((acc, g) => acc + g.potentialSavings.dependencyCount, 0) +
+              deps.filter((d) => d.verdict === "REMOVE").length,
+          };
+
+          const pkgResult: ScanResult = {
+            projectPath: pkgPath,
+            scannedAt: new Date().toISOString(),
+            dependencies: deps,
+            duplicates: dups,
+            summary: pkgSummary,
+            estimatedSavings: pkgSavings,
+          };
+
+          allResults.push(pkgResult);
+
+          // Per-package header
+          console.log(pc.bold("═".repeat(43)));
+          console.log(pc.bold(`  ${pc.cyan(pkgRelDir)}`));
+          console.log(pc.bold("═".repeat(43)));
+          consoleReporter.printScanSummary(pkgResult, { actionableOnly: options.actionableOnly });
+          consoleReporter.printDuplicates(pkgResult.duplicates);
+          consoleReporter.printActionItems(pkgResult.dependencies, { actionableOnly: options.actionableOnly });
+          printNextSteps(pkgResult);
+
+          if (hasActionableIssues(pkgResult, !!options.checkDuplicates)) hasAnyIssues = true;
+        }
+
+        if (allResults.length === 0) {
+          console.log(pc.dim("No packages with dependencies found in workspace."));
+          return;
+        }
+
+        // Aggregate workspace summary
+        const aggTotal = allResults.reduce((a, r) => a + r.summary.total, 0);
+        const aggRemove = allResults.reduce((a, r) => a + r.summary.remove, 0);
+        const aggRecode = allResults.reduce((a, r) => a + r.summary.recodeNative, 0);
+        const aggInvestigate = allResults.reduce((a, r) => a + r.summary.investigate, 0);
+        const aggPeer = allResults.reduce((a, r) => a + r.summary.peerDep, 0);
+
+        console.log(pc.bold("═".repeat(43)));
+        console.log(pc.bold(`  Workspace Summary (${allResults.length} packages)`));
+        console.log(pc.bold("═".repeat(43)));
+        console.log(`  Total deps: ${aggTotal} across ${allResults.length} packages`);
+        if (aggRemove > 0) console.log(`  ${pc.red("✗")} Remove:        ${aggRemove}`);
+        if (aggRecode > 0) console.log(`  ${pc.yellow("↻")} Recode Native: ${aggRecode}`);
+        if (aggPeer > 0)   console.log(`  ${pc.blue("⊕")} Peer Dep:      ${aggPeer}`);
+        if (aggInvestigate > 0) console.log(`  ${pc.magenta("?")} Investigate:   ${aggInvestigate}`);
+        if (aggRemove === 0 && aggRecode === 0 && aggPeer === 0) {
+          console.log(`  ${pc.green("✓")} No actionable issues found`);
+        }
+        console.log("");
+
+        if (options.exitCode !== false && hasAnyIssues) process.exit(EXIT_ISSUES_FOUND);
+        return;
+      }
+      // ── End workspace mode ───────────────────────────────────────────────
 
       const srcPaths = resolveSrcPaths(projectPath, config.srcPaths);
       const analyzer = new UsageAnalyzer({
