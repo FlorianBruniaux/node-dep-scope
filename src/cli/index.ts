@@ -6,6 +6,7 @@
  */
 
 import { program } from "commander";
+import pc from "picocolors";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { UsageAnalyzer } from "../analyzers/usage-analyzer.js";
@@ -279,6 +280,10 @@ program
       // Output
       await outputResult(result, format, output, options.actionableOnly);
 
+      if ((format ?? "console") === "console") {
+        printNextSteps(result);
+      }
+
       // Exit with appropriate code for CI
       if (options.exitCode !== false && hasActionableIssues(result, !!options.checkDuplicates)) {
         process.exit(EXIT_ISSUES_FOUND);
@@ -548,6 +553,15 @@ program
 
       // Also print summary
       consoleReporter.printScanSummary(result);
+
+      console.log(pc.bold("Next steps:"));
+      console.log(`  ${pc.cyan("→")} Pipe into Claude:`);
+      console.log(`      claude -p "$(cat ${outputPath})"`);
+      if (summary.recodeNative + summary.consolidate > 0) {
+        console.log(`  ${pc.yellow("↻")} Generate per-package migration prompts:`);
+        console.log(`      dep-scope migrate`);
+      }
+      console.log("");
     } catch (error) {
       handleError(error);
     }
@@ -803,6 +817,29 @@ program
 // ═══════════════════════════════════════════
 // Helper functions
 // ═══════════════════════════════════════════
+
+function printNextSteps(result: ScanResult): void {
+  const removable = result.dependencies.filter((d) => d.verdict === "REMOVE");
+  const migratable = result.summary.recodeNative + result.summary.consolidate;
+
+  if (removable.length === 0 && migratable === 0) return;
+
+  console.log(pc.bold("Next steps:"));
+
+  if (removable.length > 0) {
+    const names = removable.map((d) => d.name).join(" ");
+    console.log(`  ${pc.red("✗")} Remove unused:  npm remove ${names}`);
+  }
+
+  if (migratable > 0) {
+    console.log(`  ${pc.yellow("↻")} Generate migration prompts:`);
+    console.log(`      dep-scope migrate`);
+    console.log(pc.dim(`      → Writes .dep-scope/migrate-<pkg>.md — pipe each file into Claude`));
+    console.log(pc.dim(`      → claude -p "$(cat .dep-scope/migrate-<pkg>.md)"`));
+  }
+
+  console.log("");
+}
 
 async function outputResult(
   result: ScanResult,

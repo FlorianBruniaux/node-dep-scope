@@ -7,7 +7,17 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 /** Common source directories ordered by priority */
-const COMMON_SRC_DIRS = ["src", "lib", "app", "pages", "components", "hooks", "server"];
+const COMMON_SRC_DIRS = [
+  "src",
+  "lib",
+  "app",
+  "pages",
+  "components",
+  "hooks",
+  "server",
+  "packages",
+  "apps",
+];
 
 /** Next.js specific directories to try first */
 const NEXTJS_SRC_DIRS = ["src", "app", "lib", "components", "hooks", "server", "trpc", "shared"];
