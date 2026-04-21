@@ -194,6 +194,36 @@ export const DEFAULT_WELL_KNOWN_PATTERNS: WellKnownPattern[] = [
   { pattern: "bullmq", verdict: "KEEP", reason: "Job queue" },
   { pattern: "agenda", verdict: "KEEP", reason: "Job scheduler" },
 
+  // Payment - single server instance + single client init
+  { pattern: "stripe", verdict: "KEEP", reason: "Stripe server SDK (single instance)" },
+  { pattern: "@stripe/*", verdict: "KEEP", reason: "Stripe SDK (single init file)" },
+
+  // Realtime/WebSocket - single connection setup per side
+  { pattern: "pusher", verdict: "KEEP", reason: "Pusher server SDK (single connection)" },
+  { pattern: "pusher-js", verdict: "KEEP", reason: "Pusher client SDK (single connection)" },
+  { pattern: "ably", verdict: "KEEP", reason: "Ably realtime (single connection)" },
+  { pattern: "socket.io", verdict: "KEEP", reason: "Socket.io server (single setup)" },
+  { pattern: "socket.io-client", verdict: "KEEP", reason: "Socket.io client (single connection)" },
+  { pattern: "ws", verdict: "KEEP", reason: "WebSocket (single server setup)" },
+
+  // Notification/Messaging services - single provider init
+  { pattern: "@knocklabs/*", verdict: "KEEP", reason: "Knock notification SDK (single provider)" },
+  { pattern: "@novu/*", verdict: "KEEP", reason: "Novu notification SDK (single provider)" },
+  { pattern: "twilio", verdict: "KEEP", reason: "Twilio SDK (single client)" },
+
+  // Third-party API clients - single integration file
+  { pattern: "@notionhq/*", verdict: "KEEP", reason: "Notion API client (single integration file)" },
+  { pattern: "@airtable/*", verdict: "KEEP", reason: "Airtable client (single integration file)" },
+  { pattern: "airtable", verdict: "KEEP", reason: "Airtable client (single integration file)" },
+
+  // Analytics/Monitoring - single init
+  { pattern: "@sentry/*", verdict: "KEEP", reason: "Sentry (single instrumentation file)" },
+  { pattern: "posthog-js", verdict: "KEEP", reason: "PostHog analytics (single init)" },
+  { pattern: "posthog-node", verdict: "KEEP", reason: "PostHog server SDK (single init)" },
+  { pattern: "@posthog/*", verdict: "KEEP", reason: "PostHog SDK" },
+  { pattern: "@segment/*", verdict: "KEEP", reason: "Segment analytics (single init)" },
+  { pattern: "mixpanel", verdict: "KEEP", reason: "Mixpanel analytics (single init)" },
+
   // Misc specialized libraries
   { pattern: "dataloader", verdict: "KEEP", reason: "Data batching (single setup)" },
   { pattern: "svix", verdict: "KEEP", reason: "Webhook service" },
