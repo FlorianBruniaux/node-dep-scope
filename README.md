@@ -57,6 +57,8 @@ Action Items:
 | Symbol-level analysis | ❌ | ❌ | ✅ | ✅ |
 | Native alternatives database | ❌ | ❌ | ✅ (lodash) | ✅ 195 packages |
 | e18e micro-utilities coverage | ❌ | ❌ | ❌ | ✅ |
+| Transitive graph analysis | ❌ | ❌ | ❌ | ✅ |
+| Monorepo workspace support | ⚠️ | ❌ | ❌ | ✅ |
 | Duplicate detection | ❌ | ❌ | ❌ | ✅ |
 | LLM migration prompt | ❌ | ❌ | ❌ | ✅ |
 | OSS / free | ✅ | ✅ | ❌ enterprise | ✅ |
@@ -90,6 +92,8 @@ cd /path/to/your/project
 
 dep-scope scan                        # full scan
 dep-scope scan --check-duplicates     # include duplicate detection
+dep-scope scan --check-transitive     # surface transitive polyfills (e18e database)
+dep-scope scan --each-workspace       # monorepo: scan each package individually
 dep-scope migrate                     # generate migration prompts for all candidates
 dep-scope migrate lodash              # target a specific package
 dep-scope report -o ./audit.md        # markdown report

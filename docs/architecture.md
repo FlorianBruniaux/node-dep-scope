@@ -151,6 +151,17 @@ This prevents false positives where `@/components/Button` would incorrectly be c
 Transitive echoes (reportable upstream or via overrides):
   ↗ is-string          via lodash              → typeof x === 'string'
   ↗ has-flag           via chalk               → process.argv.includes('--flag')
+
+These packages cannot be removed from your package.json directly.
+Next steps:
+  1. Report to upstream — open an issue or link to https://e18e.dev
+  2. Force a version via overrides (npm/pnpm) or resolutions (Yarn):
+
+     "overrides": {
+       "is-string": "npm:is-string@*"
+     }
+
+  dep-scope analyze <package>  — deep-dive any direct dep to see which transitives it pulls
 ```
 
 **Why `↗` and not `✗`**: transitive packages cannot be removed directly from `package.json`. The action is to report the issue to the upstream package maintainer or force a version via `overrides` (npm/pnpm) / `resolutions` (Yarn). These findings do **not** trigger exit code 1 — they are informational.
@@ -158,6 +169,36 @@ Transitive echoes (reportable upstream or via overrides):
 **Supported layouts**: npm (flat), pnpm (strict + non-strict, `.pnpm/` store), Bun (same as npm). Yarn PnP is detected and skipped with a warning.
 
 **Performance**: BFS reads package.json files with caching. Typical time: ~1s for 1500 packages. The size calculation is not included (no disk I/O beyond JSON files).
+
+---
+
+## Monorepo / Workspace Mode
+
+`dep-scope scan --each-workspace` detects the workspace layout and runs a separate scan per package, then prints an aggregate summary.
+
+```
+Workspace detected (pnpm): 4 packages
+
+═══════════════════════════════════════════
+  apps/web
+═══════════════════════════════════════════
+  Summary: 45 deps — 40 KEEP, 2 RECODE_NATIVE, 1 REMOVE
+  ...
+
+═══════════════════════════════════════════
+  Workspace Summary (4 packages)
+═══════════════════════════════════════════
+  Total deps: 89 across 4 packages
+  ✗ Remove:        1
+  ↻ Recode Native: 2
+  ✓ No actionable issues found
+```
+
+**Why not scan the root**: monorepo roots typically have no app dependencies — only workspace tooling. Scanning the root returns 0 deps. Each workspace package has its own `package.json` with its own dependency tree.
+
+**Supported workspace configs**: `pnpm-workspace.yaml`, `package.json#workspaces` (npm/yarn), `turbo.json`, `lerna.json`.
+
+Packages without a `package.json` or with 0 dependencies are skipped automatically.
 
 ---
 

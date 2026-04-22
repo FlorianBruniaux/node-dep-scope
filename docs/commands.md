@@ -24,6 +24,7 @@ Scans all dependencies and outputs a summary with verdicts.
 | `--no-knip` | Disable Knip integration even if available | `false` |
 | `--check-duplicates` | Enable duplicate library detection | `false` |
 | `--check-transitive` | Scan transitive deps for packages with native alternatives | `false` |
+| `--each-workspace` | Scan each workspace package individually (monorepo mode) | `false` |
 | `--actionable-only` | Show only actionable items (hide INVESTIGATE) | `false` |
 | `--no-config` | Ignore config file | `false` |
 | `--no-auto-detect` | Disable monorepo workspace auto-detection | `false` |
@@ -35,9 +36,46 @@ dep-scope scan -s src lib app components
 dep-scope scan -d
 dep-scope scan --check-duplicates
 dep-scope scan --check-transitive
+dep-scope scan --each-workspace
 dep-scope scan -f json -o ./deps.json
 dep-scope scan -p /path/to/project
 ```
+
+---
+
+---
+
+## `scan --each-workspace` — Monorepo mode
+
+```bash
+dep-scope scan --each-workspace
+dep-scope scan --each-workspace -p /path/to/monorepo
+```
+
+Detects the workspace configuration and scans each package individually. Displays a per-package report followed by an aggregate summary.
+
+**Supported layouts**: `pnpm-workspace.yaml`, `package.json#workspaces` (npm/yarn), `turbo.json`, Lerna.
+
+**Output:**
+
+```
+Workspace detected (pnpm): 4 packages
+
+═══════════════════════════════════════════
+  apps/web
+═══════════════════════════════════════════
+  Summary: 45 deps — 40 KEEP, 2 RECODE_NATIVE, 1 REMOVE
+  ...
+
+═══════════════════════════════════════════
+  Workspace Summary (4 packages)
+═══════════════════════════════════════════
+  Total deps: 89 across 4 packages
+  ✗ Remove:        1
+  ↻ Recode Native: 2
+```
+
+Packages with no `package.json` or 0 dependencies are skipped. All other `scan` flags are compatible (`--check-transitive`, `--check-duplicates`, `--actionable-only`, etc.).
 
 ---
 
