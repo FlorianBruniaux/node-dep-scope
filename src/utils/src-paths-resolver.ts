@@ -17,10 +17,14 @@ const COMMON_SRC_DIRS = [
   "server",
   "packages",
   "apps",
+  "scripts",
+  "tools",
+  "bin",
+  "cli",
 ];
 
 /** Next.js specific directories to try first */
-const NEXTJS_SRC_DIRS = ["src", "app", "lib", "components", "hooks", "server", "trpc", "shared"];
+const NEXTJS_SRC_DIRS = ["src", "app", "lib", "components", "hooks", "server", "trpc", "shared", "scripts"];
 
 /**
  * Resolve source paths for a project.

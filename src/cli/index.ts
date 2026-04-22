@@ -166,6 +166,7 @@ program
   .option("--check-duplicates", "Check for duplicate libraries (off by default)")
   .option("--check-transitive", "Scan transitive deps for packages with native alternatives")
   .option("--each-workspace", "Scan each workspace package individually (monorepo mode)")
+  .option("--root", "Scan from project root, includes scripts/, tools/, bin/ (equivalent to --src .)")
   .option("--no-config", "Ignore config file")
   .option("--no-exit-code", "Always exit with code 0 (for CI debugging)")
   .option("--no-auto-detect", "Disable monorepo workspace auto-detection")
@@ -179,6 +180,7 @@ program
       // Merge CLI options with config (CLI takes precedence)
       const cliOptions: Partial<DepScopeConfig> = {
         ...(options.src && { srcPaths: options.src }),
+        ...(options.root && { srcPaths: ["."] }),  // --root overrides --src
         ...(options.threshold && { threshold: validateThreshold(options.threshold) }),
         ...(options.includeDev !== undefined && { includeDev: options.includeDev }),
         ...(options.ignore && { ignore: options.ignore }),
@@ -414,7 +416,7 @@ program
       await outputResult(result, format, output, options.actionableOnly);
 
       if ((format ?? "console") === "console") {
-        printNextSteps(result);
+        printNextSteps(result, srcPaths);
         if (result.transitiveEchoes && result.transitiveEchoes.length > 0) {
           consoleReporter.printTransitiveEchoes(result.transitiveEchoes);
         }
@@ -438,6 +440,7 @@ program
   .description("Analyze a specific dependency")
   .option("-p, --path <path>", "Project path", process.cwd())
   .option("-s, --src <paths...>", "Source directories")
+  .option("--root", "Scan from project root, includes scripts/, tools/, bin/ (equivalent to --src .)")
   .option("-f, --format <type>", "Output format: console, markdown, json")
   .option("-o, --output <file>", "Output file path")
   .option("-v, --verbose", "Verbose output")
@@ -452,6 +455,7 @@ program
       // Merge CLI options with config
       const cliOptions: Partial<DepScopeConfig> = {
         ...(options.src && { srcPaths: options.src }),
+        ...(options.root && { srcPaths: ["."] }),  // --root overrides --src
         ...(options.verbose !== undefined && { verbose: options.verbose }),
         ...(options.format && { format: validateFormat(options.format) }),
         ...(options.output && { output: options.output }),
@@ -954,7 +958,7 @@ program
 // Helper functions
 // ═══════════════════════════════════════════
 
-function printNextSteps(result: ScanResult): void {
+function printNextSteps(result: ScanResult, scannedPaths?: string[]): void {
   const removable = result.dependencies.filter((d) => d.verdict === "REMOVE");
   const migratable = result.summary.recodeNative + result.summary.consolidate;
 
@@ -965,6 +969,10 @@ function printNextSteps(result: ScanResult): void {
   if (removable.length > 0) {
     const names = removable.map((d) => d.name).join(" ");
     console.log(`  ${pc.red("✗")} Remove unused:  npm remove ${names}`);
+    if (scannedPaths && !scannedPaths.includes(".")) {
+      console.log(pc.dim(`      ⚠ Scanned ${scannedPaths.join(", ")} only — verify these aren't used in scripts/, tools/, etc.`));
+      console.log(pc.dim(`      → Use --root . to scan the full project before removing`));
+    }
   }
 
   if (migratable > 0) {
