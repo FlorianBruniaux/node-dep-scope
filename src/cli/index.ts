@@ -27,6 +27,8 @@ import { generateMigration, getOrBuildTemplate } from "../migration/index.js";
 import { resolveTsConfig } from "../utils/tsconfig-resolver.js";
 import { resolveSrcPaths } from "../utils/src-paths-resolver.js";
 import { detectPackageManager } from "../utils/package-manager-detector.js";
+import { detectProjectInfo } from "../utils/project-detector.js";
+import { runInitWizard, generateJsonConfig, generateTsConfig } from "./init-wizard.js";
 import { PackageJsonReader } from "../utils/package-json-reader.js";
 import { detectWorkspace } from "../utils/workspace-detector.js";
 import type { MigrationContext } from "../migration/types.js";
@@ -77,6 +79,13 @@ function validateThreshold(threshold: string): number {
     );
   }
   return num;
+}
+
+function isUserAbort(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === "ExitPromptError" || error.message.includes("User force closed"))
+  );
 }
 
 function handleError(error: unknown): never {
@@ -915,41 +924,54 @@ async function detectFramework(
 
 program
   .command("init")
-  .description("Create a dep-scope config file")
+  .description("Configure dep-scope for your project (interactive wizard)")
   .option("-p, --path <path>", "Project path", process.cwd())
+  .option("-y, --yes", "Skip prompts and write defaults (non-interactive)")
   .action(async (options) => {
     try {
       const projectPath = await validateProjectPath(options.path);
-      const configPath = path.join(projectPath, ".depscoperc.json");
+      const info = detectProjectInfo(projectPath);
 
-      // Check if config already exists
-      try {
-        await fs.access(configPath);
-        console.log("Config file already exists at .depscoperc.json");
+      // Non-interactive mode: write sensible defaults without prompting
+      if (options.yes || !process.stdin.isTTY) {
+        const defaultSrcPaths = info.existingDirs.length > 0
+          ? info.existingDirs.map((d) => `./${d}`)
+          : ["./src"];
+        const config = {
+          extends: info.suggestedPreset,
+          srcPaths: defaultSrcPaths,
+          threshold: 5,
+          includeDev: false,
+        };
+        const outPath = path.join(projectPath, ".depscoperc.json");
+        await fs.writeFile(outPath, JSON.stringify(config, null, 2) + "\n");
+        console.log(`Created .depscoperc.json (${info.suggestedPreset} preset, dirs: ${defaultSrcPaths.join(", ")})`);
         return;
-      } catch {
-        // File doesn't exist, continue
       }
 
-      const defaultConfig: DepScopeConfig = {
-        extends: "minimal",
-        srcPaths: ["./src"],
-        threshold: 5,
-        includeDev: false,
-        format: "console",
-      };
+      const result = await runInitWizard(projectPath, info);
+      if (!result) {
+        console.log("Cancelled.");
+        return;
+      }
 
-      await fs.writeFile(configPath, JSON.stringify(defaultConfig, null, 2) + "\n");
-      console.log("Created .depscoperc.json with default configuration.");
-      console.log("\nYou can customize:");
-      console.log("  - extends: preset to use (minimal, react, node)");
-      console.log("  - srcPaths: directories to scan");
-      console.log("  - threshold: symbol count for RECODE_NATIVE verdict");
-      console.log("  - ignore: packages to skip");
-      console.log("  - wellKnownPatterns: auto-KEEP/IGNORE packages");
-      console.log("  - format: default output format");
-      console.log("\nFor TypeScript config, use: depscope.config.ts with defineConfig()");
+      const content =
+        result.format === "ts"
+          ? generateTsConfig(result)
+          : generateJsonConfig(result);
+
+      await fs.writeFile(result.outputPath, content, "utf-8");
+
+      const rel = path.relative(projectPath, result.outputPath);
+      console.log(`\n${pc.green("✓")} Created ${rel}`);
+      console.log(pc.dim(`  Preset: ${result.preset}  |  Dirs: ${result.srcPaths.join(", ")}  |  Threshold: ${result.threshold}`));
+      console.log(pc.dim(`\n  Run: dep-scope scan`));
     } catch (error) {
+      // Ctrl-C from inquirer throws ExitPromptError — exit cleanly
+      if (isUserAbort(error)) {
+        console.log("\nCancelled.");
+        return;
+      }
       handleError(error);
     }
   });
