@@ -62,7 +62,7 @@ export default defineConfig({
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `srcPaths` | string[] | `["./src"]` | Source directories to scan. Auto-detected if paths don't exist. |
+| `srcPaths` | string[] | auto-detected | Source directories to scan. Auto-detects `src`, `app`, `lib`, `pages`, `components`, `hooks`, `server`, `scripts`, `tools`, `bin`, `cli` when not set. Use `["."]` to scan the full project root. |
 | `threshold` | number | `5` | Symbol count threshold for RECODE verdict |
 | `includeDev` | boolean | `false` | Include devDependencies |
 | `ignore` | string[] | `[]` | Packages to ignore (supports globs) |
@@ -74,7 +74,9 @@ export default defineConfig({
 
 The following directories are always excluded from scanning: `node_modules`, `dist`, `.next`, `coverage`, `build`, `out`, `.nuxt`, `.svelte-kit`, `.turbo`, `storybook-static`.
 
-> **Most common cause of inaccurate results**: the `srcPaths` option. If dep-scope prints `No standard source directories found — scanning from project root`, configure `srcPaths` explicitly — all verdicts are unreliable until then. Example for a NestJS + React Router project: `{ "srcPaths": ["src", "server", "client", "app"] }`.
+> **Packages appearing as unused despite being imported?** They may be used only in `scripts/`, `tools/`, or another directory outside the scan scope. Run `dep-scope scan --root` to scan the full project root, or add the missing directories to `srcPaths`. When dep-scope prints a "Remove unused" recommendation, a warning is shown if the scan scope is narrow — always verify before running `npm remove`.
+
+> **Most common cause of inaccurate results**: `srcPaths` missing directories where your code lives. Run `dep-scope init` to auto-detect the right paths, or set them explicitly. Example for a NestJS + React Router project: `{ "srcPaths": ["src", "server", "client", "app"] }`.
 
 ## Presets
 

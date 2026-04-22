@@ -18,9 +18,13 @@ npm run dev        # Watch mode compilation
 node dist/cli/index.js --help  # Run CLI directly
 
 # CLI usage
+dep-scope init                                # Interactive wizard: detect project + generate config
+dep-scope init --yes                          # Non-interactive: write defaults (CI-safe)
 dep-scope scan                                # Scan all dependencies
+dep-scope scan --root                         # Scan full project root (scripts/, tools/, bin/, etc.)
 dep-scope scan --check-duplicates             # Include duplicate detection
 dep-scope analyze <package>                   # Analyze specific package
+dep-scope analyze <package> --root            # Analyze with full project scan scope
 dep-scope duplicates                          # Find duplicate libraries
 dep-scope report -p /path -o ./audit.md       # Generate full report
 dep-scope migrate                             # Auto-detect + generate migration prompts
@@ -37,6 +41,9 @@ src/
 │   ├── import-analyzer.ts      # AST parsing via @typescript-eslint/parser
 │   ├── usage-analyzer.ts       # Main orchestrator - aggregates imports, determines verdicts
 │   └── peer-dep-analyzer.ts    # Scans node_modules/*/package.json for peer deps
+├── cli/
+│   ├── index.ts                # Commander.js CLI entry point
+│   └── init-wizard.ts          # Interactive wizard (@inquirer/prompts) for dep-scope init
 ├── config/
 │   ├── schema.ts               # Zod schemas for config validation
 │   ├── loader.ts               # Multi-format config loading (JSON, YAML, TS, JS)
@@ -61,9 +68,9 @@ src/
 │   └── markdown-reporter.ts    # Markdown report generation
 ├── utils/
 │   ├── path-alias-detector.ts  # Filters @/, ~/, tsconfig paths from analysis
+│   ├── project-detector.ts     # Detects framework, existing dirs, preset — used by init wizard
 │   ├── src-paths-resolver.ts   # Auto-detects source directories when configured paths don't exist
 │   └── tsconfig-resolver.ts    # Resolves compilerOptions.target following extends chains
-├── cli/index.ts                # Commander.js CLI entry point
 └── index.ts                    # Public API exports
 ```
 

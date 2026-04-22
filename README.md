@@ -90,7 +90,9 @@ npx @florianbruniaux/dep-scope scan
 ```bash
 cd /path/to/your/project
 
+dep-scope init                        # configure dep-scope for your project (interactive)
 dep-scope scan                        # full scan
+dep-scope scan --root                 # scan full project, including scripts/ tools/ bin/
 dep-scope scan --check-duplicates     # include duplicate detection
 dep-scope scan --check-transitive     # surface transitive polyfills (e18e database)
 dep-scope scan --each-workspace       # monorepo: scan each package individually
@@ -99,19 +101,19 @@ dep-scope migrate lodash              # target a specific package
 dep-scope report -o ./audit.md        # markdown report
 ```
 
-## Getting accurate results: configure srcPaths
+## Getting accurate results
 
-dep-scope scans the directories listed in `srcPaths` (default: `./src`). If your source files live elsewhere the tool will flag packages as unused when they're not.
+dep-scope scans the directories listed in `srcPaths`. Run `dep-scope init` to auto-detect the right paths for your project — it detects your framework and existing directories, then generates the config.
 
-Create `.depscoperc.json` in your project root:
+Auto-detection covers: `src`, `app`, `lib`, `pages`, `components`, `hooks`, `server`, `scripts`, `tools`, `bin`, `cli`. If your project has code elsewhere, pass `--root` to scan everything, or set `srcPaths` explicitly:
 
 ```json
 {
-  "srcPaths": ["src", "app", "pages", "components", "lib", "hooks", "server"]
+  "srcPaths": ["src", "app", "scripts", "tools"]
 }
 ```
 
-Run with `--verbose` to see which paths were used (and whether auto-detection kicked in). Auto-detection is built-in: if `./src` doesn't exist, dep-scope tries `app`, `lib`, `pages`, `components`, `hooks`, `server` automatically.
+> **False positive "unused" verdict?** The package may be used in a directory outside the scan scope (`scripts/`, `tools/`, etc.). Run `dep-scope scan --root` to verify before removing anything. When a removal recommendation appears with a narrow scan scope, dep-scope will warn you.
 
 ## Documentation
 

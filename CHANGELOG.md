@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.8] - 2026-04-22
+
+### Added
+
+- **`dep-scope init` wizard**: `init` is now an interactive wizard powered by `@inquirer/prompts`. It detects the project framework (Next.js, React, Node.js), discovers existing source directories, suggests a preset, and asks 4 questions: scan scope, devDependencies, RECODE threshold, config format (JSON or TypeScript). Writes `.depscoperc.json` or `depscope.config.ts`. Use `-y / --yes` for non-interactive mode (CI-safe). Ctrl-C exits cleanly.
+
+- **`--root` flag** (`scan`, `analyze`): Shorthand for `--src .` — scans the full project root including `scripts/`, `tools/`, `bin/`, and any other top-level directory. Use when a dependency is used outside the auto-detected scope.
+
+- **`scripts/`, `tools/`, `bin/`, `cli/` in auto-detection** (`src/utils/src-paths-resolver.ts`): These directories are now included in auto-detection, fixing false-positive `REMOVE` verdicts for packages used only in script or tooling files. `scripts` is also added to the Next.js-specific candidate list.
+
+- **Scope warning on REMOVE verdict**: When `scan` recommends removing a package and the scan scope does not cover the full project root, a dim warning is printed below the `npm remove` line: `⚠ Scanned … only — verify these aren't used in scripts/, tools/, etc.` and `→ Use --root . to scan the full project before removing`.
+
+- **`src/utils/project-detector.ts`**: New utility that consolidates framework detection, directory discovery, and preset selection. Used by the init wizard; can be used programmatically.
+
+### Fixed
+
+- **False-positive REMOVE/RECODE on packages used in `scripts/`**: Packages imported only in `scripts/`, `tools/`, or `bin/` were flagged as unused because auto-detection only covered `src`-style directories. This caused dangerous `npm remove` suggestions that silently broke scripting dependencies (e.g. `gray-matter` in content migration scripts). The fix is twofold: auto-detection now includes those directories, and a warning is shown when the scan scope may be incomplete.
+
 ## [0.2.0] - 2026-04-19
 
 ### Added

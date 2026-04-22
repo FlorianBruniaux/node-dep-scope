@@ -1,5 +1,47 @@
 # Commands
 
+## `init` — Configure dep-scope (interactive wizard)
+
+```bash
+dep-scope init [options]
+```
+
+Detects your project (framework, existing directories) and guides you through 4 questions to generate a `.depscoperc.json` or `depscope.config.ts` tailored to your project layout.
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `-p, --path <path>` | Project path (default: current directory) |
+| `-y, --yes` | Skip prompts and write defaults (CI-safe) |
+
+**Wizard flow:**
+
+```
+dep-scope init
+
+  Detected: Next.js project
+  Found dirs: src/, scripts/, app/
+
+? Source directories to scan:
+  ● Auto-detected: src/, scripts/, app/  (recommended)
+  ○ Full project root (.) — includes everything
+  ○ Choose directories manually...
+
+? Include devDependencies in scan? (y/N)
+? Symbol threshold for RECODE_NATIVE verdict: (5)
+? Config format:
+  ● .depscoperc.json  (simple JSON, recommended)
+  ○ depscope.config.ts  (TypeScript with autocomplete)
+
+✓ Created .depscoperc.json
+  Preset: react  |  Dirs: src, scripts, app  |  Threshold: 5
+```
+
+Running `init` on a project that already has a config will ask whether to overwrite it. In non-interactive environments (`--yes` or no TTY) it writes sensible defaults silently.
+
+---
+
 ## `scan` — Analyze all dependencies
 
 ```bash
@@ -13,7 +55,8 @@ Scans all dependencies and outputs a summary with verdicts.
 | Option | Description | Default |
 |--------|-------------|---------|
 | `-p, --path <path>` | Project path | Current directory |
-| `-s, --src <paths...>` | Source directories to scan | `./src` (with auto-detection) |
+| `-s, --src <paths...>` | Source directories to scan | auto-detected |
+| `--root` | Scan from project root — includes `scripts/`, `tools/`, `bin/` (shorthand for `--src .`) | `false` |
 | `-t, --threshold <n>` | Symbol count threshold for RECODE verdict | `5` |
 | `-d, --include-dev` | Include devDependencies | `false` |
 | `-f, --format <type>` | Output format: `console`, `markdown`, `json` | `console` |
@@ -32,7 +75,9 @@ Scans all dependencies and outputs a summary with verdicts.
 **Examples:**
 
 ```bash
-dep-scope scan -s src lib app components
+dep-scope scan
+dep-scope scan --root                   # scan full project, including scripts/ tools/ bin/
+dep-scope scan -s src scripts           # explicit paths
 dep-scope scan -d
 dep-scope scan --check-duplicates
 dep-scope scan --check-transitive
@@ -40,6 +85,8 @@ dep-scope scan --each-workspace
 dep-scope scan -f json -o ./deps.json
 dep-scope scan -p /path/to/project
 ```
+
+**Auto-detection:** when no `srcPaths` are configured, dep-scope scans whichever of the following directories exist: `src`, `app`, `lib`, `pages`, `components`, `hooks`, `server`, `scripts`, `tools`, `bin`, `cli`, `packages`, `apps`. Use `--root .` if your project has an unusual layout.
 
 ---
 
@@ -87,8 +134,18 @@ dep-scope analyze <package> [options]
 
 Deep analysis of a single dependency: all symbols used, file locations, and alternatives.
 
+| Option | Description |
+|--------|-------------|
+| `-p, --path <path>` | Project path |
+| `-s, --src <paths...>` | Source directories |
+| `--root` | Scan from project root (includes `scripts/`, `tools/`, `bin/`) |
+| `-f, --format <type>` | Output format |
+| `-v, --verbose` | Verbose output |
+
 ```bash
 dep-scope analyze lodash
+dep-scope analyze gray-matter              # scans auto-detected dirs including scripts/
+dep-scope analyze gray-matter --root      # scan full project if used only in scripts/
 dep-scope analyze @tanstack/react-query -f markdown
 ```
 
