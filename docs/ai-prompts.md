@@ -14,8 +14,8 @@ Then analyze the output:
 5. Produce a prioritized action plan: quick wins (REMOVE + trivial RECODE) first,
    then migrations, then consolidations
 If dep-scope is not installed: `npm install -g @florianbruniaux/dep-scope` first.
-If srcPaths seems wrong (packages flagged REMOVE that you know are used), re-run with
-`-s src app pages components lib hooks` and note the discrepancy.
+If a package flagged REMOVE is actually used (e.g. in scripts/ or tools/), re-run with
+`--root` to scan the full project before drawing conclusions.
 ```
 
 ## Migration audit: full project
