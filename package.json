@@ -1,6 +1,6 @@
 {
   "name": "@florianbruniaux/dep-scope",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "Symbol-level dependency analysis for TypeScript/JavaScript projects. Flags unused deps, native alternatives (195 packages including e18e micro-utilities), and duplicates — then generates LLM-ready migration prompts to remove them.",
   "keywords": [
     "dependencies",

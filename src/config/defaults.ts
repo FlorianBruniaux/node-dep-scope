@@ -188,6 +188,15 @@ export const DEFAULT_WELL_KNOWN_PATTERNS: WellKnownPattern[] = [
   { pattern: "sonner", verdict: "KEEP", reason: "Toast component" },
   { pattern: "input-otp", verdict: "KEEP", reason: "OTP input component" },
   { pattern: "@uiw/*", verdict: "KEEP", reason: "UIW components" },
+  { pattern: "@dnd-kit/*", verdict: "KEEP", reason: "DnD Kit (drag-and-drop, single setup)" },
+  { pattern: "react-dnd*", verdict: "KEEP", reason: "React DnD (drag-and-drop, single setup)" },
+  { pattern: "@xterm/*", verdict: "KEEP", reason: "xterm.js terminal (single instance)" },
+  { pattern: "xterm", verdict: "KEEP", reason: "xterm.js terminal (single instance)" },
+  { pattern: "react-resizable-panels", verdict: "KEEP", reason: "Resizable panels (single layout usage)" },
+  { pattern: "react-resizable*", verdict: "KEEP", reason: "Resizable component (single usage)" },
+  { pattern: "react-virtuoso", verdict: "KEEP", reason: "Virtual list (single component)" },
+  { pattern: "react-window", verdict: "KEEP", reason: "Virtual list (single component)" },
+  { pattern: "@tanstack/react-virtual", verdict: "KEEP", reason: "Virtual list (single component)" },
 
   // Math/Rendering - specialized single-use
   { pattern: "katex", verdict: "KEEP", reason: "Math rendering" },
