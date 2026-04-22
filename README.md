@@ -101,11 +101,36 @@ dep-scope migrate lodash              # target a specific package
 dep-scope report -o ./audit.md        # markdown report
 ```
 
+## Setup: `dep-scope init`
+
+Run `dep-scope init` before your first scan. The wizard detects your project and generates a config in 4 questions:
+
+```
+dep-scope init
+
+  Detected: Next.js project
+  Found dirs: src/, scripts/, app/
+
+? Source directories to scan:
+  ● Auto-detected: src/, scripts/, app/  (recommended)
+  ○ Full project root (.) — includes everything
+  ○ Choose directories manually...
+
+? Include devDependencies in scan? (y/N)
+? Symbol threshold for RECODE_NATIVE verdict: (5)
+? Config format:
+  ● .depscoperc.json  (simple JSON, recommended)
+  ○ depscope.config.ts  (TypeScript with autocomplete)
+
+✓ Created .depscoperc.json
+  Preset: react  |  Dirs: src, scripts, app  |  Threshold: 5
+```
+
+Use `-y` to skip prompts in CI: `dep-scope init --yes`.
+
 ## Getting accurate results
 
-dep-scope scans the directories listed in `srcPaths`. Run `dep-scope init` to auto-detect the right paths for your project — it detects your framework and existing directories, then generates the config.
-
-Auto-detection covers: `src`, `app`, `lib`, `pages`, `components`, `hooks`, `server`, `scripts`, `tools`, `bin`, `cli`. If your project has code elsewhere, pass `--root` to scan everything, or set `srcPaths` explicitly:
+Auto-detection covers: `src`, `app`, `lib`, `pages`, `components`, `hooks`, `server`, `scripts`, `tools`, `bin`, `cli`. If your project has code elsewhere, pass `--root` to scan everything, or set `srcPaths` explicitly in `.depscoperc.json`:
 
 ```json
 {
