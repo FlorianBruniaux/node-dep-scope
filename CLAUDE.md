@@ -316,6 +316,32 @@ npm run build && npm test
 
 Never commit if build or tests fail.
 
+## Release Checklist
+
+When bumping a version (any change to `package.json#version`), ALL of the following must be updated atomically:
+
+1. `package.json` — version field
+2. `server.json` — both `version` (top-level) and `packages[0].version`
+3. `src/cli/index.ts` — `VERSION` constant
+4. `src/mcp/server.ts` — `VERSION` constant
+5. `CHANGELOG.md` — new entry
+
+**To publish (after bump + build + tests pass):**
+
+```bash
+npm run release   # runs: npm publish --access public && mcp-publisher publish
+```
+
+`mcp-publisher` requires a valid GitHub session. If the token is expired, run:
+```bash
+mcp-publisher login github
+```
+then re-run `npm run release`.
+
+**NEVER** use bare `npm publish` — it skips the MCP registry update.
+
+The MCP server is registered as `io.github.FlorianBruniaux/dep-scope` on registry.modelcontextprotocol.io.
+
 ## Language & Communication
 
 - **User communicates in French**: Respond in French

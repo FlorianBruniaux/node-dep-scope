@@ -66,6 +66,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build && npm test",
+    "release": "npm publish --access public && mcp-publisher publish",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
