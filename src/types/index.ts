@@ -173,6 +173,8 @@ export interface AnalyzerOptions {
   nativeAlternatives?: import("../config/schema.js").CustomNativeAlternative[];
   /** Custom duplicate categories (merged with built-in DUPLICATE_CATEGORIES) */
   duplicateCategories?: import("../config/schema.js").CustomDuplicateCategory[];
+  /** String-reference detection config */
+  stringReferences?: { disable?: string[] | "all" };
 }
 
 export interface KnipPreAnalysis {
@@ -226,3 +228,13 @@ export type {
   ICacheStats,
   IParallelProcessor,
 } from "./interfaces.js";
+
+export type {
+  StringRefKind,
+  StringReference,
+  DetectorContext,
+  IStringReferenceDetector,
+  IStringReferenceAnalyzer,
+} from "./string-ref.js";
+
+export { defineDetector } from "./string-ref.js";

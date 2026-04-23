@@ -54,7 +54,7 @@ Action Items:
 | Feature | Knip | Depcheck | Moderne | dep-scope |
 |---------|------|----------|---------|-----------|
 | Unused detection | ✅ Excellent | ✅ Good | ❌ | ⚠️ Basic |
-| Config file scanning | ✅ | ✅ | ❌ | ❌ |
+| Config file scanning | ✅ | ✅ | ❌ | ✅ |
 | Symbol-level analysis | ❌ | ❌ | ✅ | ✅ |
 | Native alternatives database | ❌ | ❌ | ✅ (lodash) | ✅ 195 packages |
 | e18e micro-utilities coverage | ❌ | ❌ | ❌ | ✅ |
@@ -147,6 +147,56 @@ Auto-detection covers: `src`, `app`, `lib`, `pages`, `components`, `hooks`, `ser
 ```
 
 > **False positive "unused" verdict?** The package may be used in a directory outside the scan scope (`scripts/`, `tools/`, etc.). Run `dep-scope scan --root` to verify before removing anything. When a removal recommendation appears with a narrow scan scope, dep-scope will warn you.
+
+## Config file detection
+
+dep-scope automatically scans config files at the project root to avoid false "unused" verdicts for packages referenced as strings — a common pattern for CLI tools, test runners, and framework plugins.
+
+**Detected automatically:**
+
+| Config file | Examples detected |
+|---|---|
+| `package.json` scripts | `"lint": "oxlint ."`, `"format": "oxfmt ."` |
+| `vitest.config.*` | `environment: "jsdom"`, `setupFiles: ["@testing-library/jest-dom"]` |
+| `vite.config.*` | `plugins: ["@vitejs/plugin-vue"]` |
+| `next.config.*` | `turbo.rules["*.svg"].loaders: ["@svgr/webpack"]` |
+| `.storybook/main.*` | `addons: ["@storybook/addon-mcp"]` |
+
+These packages will appear as INVESTIGATE (or KEEP if well-used) rather than REMOVE.
+
+**Opt-out** — disable specific detectors in `.depscoperc.json`:
+
+```json
+{
+  "stringReferences": {
+    "disable": ["storybook-config"]
+  }
+}
+```
+
+Available detector IDs: `package-json-scripts`, `vitest-config`, `vite-config`, `next-config`, `storybook-config`. Use `"disable": "all"` to turn off config scanning entirely.
+
+**Extend with custom detectors** — in `depscope.config.ts`:
+
+```ts
+import { defineConfig, defineDetector } from "@florianbruniaux/dep-scope";
+
+export default defineConfig({
+  stringReferences: {
+    detectors: [
+      defineDetector({
+        id: "my-tool-config",
+        label: "my-tool.config.json",
+        filePatterns: ["my-tool.config.json"],
+        async detect(filePath, ctx) {
+          // return StringReference[] for packages found in this file
+          return [];
+        },
+      }),
+    ],
+  },
+});
+```
 
 ## MCP Server
 

@@ -1,0 +1,15 @@
+{
+  "name": "test-scripts",
+  "version": "1.0.0",
+  "scripts": {
+    "format": "oxfmt .",
+    "lint": "oxlint --fix src/",
+    "lint:and:format": "oxlint . && oxfmt .",
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "oxfmt": "^0.1.0",
+    "oxlint": "^0.3.0",
+    "typescript": "^5.0.0"
+  }
+}

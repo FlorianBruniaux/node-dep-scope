@@ -1,0 +1,7 @@
+{
+  "name": "test-next-config",
+  "devDependencies": {
+    "@svgr/webpack": "^8.0.0",
+    "next": "^14.0.0"
+  }
+}

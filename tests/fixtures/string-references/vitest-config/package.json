@@ -1,0 +1,8 @@
+{
+  "name": "test-vitest-config",
+  "devDependencies": {
+    "jsdom": "^24.0.0",
+    "@testing-library/jest-dom": "^6.0.0",
+    "vitest": "^1.0.0"
+  }
+}

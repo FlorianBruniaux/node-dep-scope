@@ -33,7 +33,7 @@ import { PackageJsonReader } from "../utils/package-json-reader.js";
 import { detectWorkspace } from "../utils/workspace-detector.js";
 import type { MigrationContext } from "../migration/types.js";
 
-const VERSION = "0.3.11";
+const VERSION = "0.4.0";
 
 const VALID_FORMATS = ["console", "markdown", "json"] as const;
 type Format = (typeof VALID_FORMATS)[number];
@@ -128,6 +128,7 @@ function buildAnalyzer(
     wellKnownPatterns: config.wellKnownPatterns,
     nativeAlternatives: config.nativeAlternatives,
     duplicateCategories: config.duplicateCategories,
+    stringReferences: config.stringReferences,
   });
 }
 

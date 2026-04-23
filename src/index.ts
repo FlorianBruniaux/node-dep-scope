@@ -111,6 +111,17 @@ export {
   PRESETS,
 } from "./config/index.js";
 
+// String-reference detection (public API)
+export { defineDetector } from "./types/string-ref.js";
+export type {
+  IStringReferenceDetector,
+  IStringReferenceAnalyzer,
+  StringReference,
+  StringRefKind,
+  DetectorContext,
+} from "./types/string-ref.js";
+export { DetectorRegistry, StringReferenceAnalyzer } from "./analyzers/string-reference/index.js";
+
 // Well-known packages
 export {
   matchWellKnownPackage,

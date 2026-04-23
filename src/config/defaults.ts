@@ -492,5 +492,6 @@ export function getDefaults(): ResolvedConfig {
     wellKnownPatterns: DEFAULT_WELL_KNOWN_PATTERNS,
     nativeAlternatives: [],
     duplicateCategories: [],
+    stringReferences: {},
   };
 }

@@ -220,6 +220,8 @@ export function resolveConfig(
       ...(fileConfig?.duplicateCategories ?? []),
       ...(cliOptions.duplicateCategories ?? []),
     ],
+
+    stringReferences: fileConfig?.stringReferences ?? cliOptions.stringReferences ?? defaults.stringReferences,
   };
 
   return resolved;

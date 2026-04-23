@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-04-23
+
+### Added
+
+- **Config file detection** (`src/analyzers/string-reference/`): dep-scope now scans config files at the project root to detect packages referenced as strings — eliminating false `REMOVE` verdicts for CLI tools, test runner environments, and framework plugins. Five built-in detectors ship enabled by default: `package-json-scripts` (scripts `"lint": "oxlint ."` → detects `oxlint`), `vitest-config` (`environment: "jsdom"` → detects `jsdom`), `vite-config`, `next-config` (turbopack loaders), `storybook-config` (`addons: ["@storybook/addon-mcp"]`). The `.storybook` directory ignore does not affect this scanner — config files are read by absolute path. Detection is gated against installed packages from `package.json` to prevent false KEEPs from generic strings.
+
+- **`stringReferences` config option**: Opt-out specific detectors via `{ "stringReferences": { "disable": ["storybook-config"] } }` or disable all with `"all"`. User-defined detectors can be added via `defineDetector()` in `depscope.config.ts`.
+
+- **`defineDetector()` public API**: Exported from `@florianbruniaux/dep-scope`. Allows authoring custom string-reference detectors for in-house config formats with full TypeScript type safety.
+
+### Fixed
+
+- `oxfmt`, `oxlint` referenced only in `package.json` scripts no longer produce `REMOVE` verdict.
+- `@storybook/addon-mcp` referenced as a string in `.storybook/main.ts` `addons` array no longer produces `REMOVE` verdict.
+- `@svgr/webpack` referenced as a string in `next.config.mjs` turbopack `loaders` no longer produces `REMOVE` verdict.
+- `jsdom` referenced as `environment: "jsdom"` in `vitest.config.ts` no longer produces `REMOVE` verdict.
+
 ## [0.3.10] - 2026-04-23
 
 ### Added

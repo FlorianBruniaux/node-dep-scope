@@ -7,6 +7,8 @@
 import { importAnalyzer as defaultImportAnalyzer } from "./import-analyzer.js";
 import { peerDepAnalyzer as defaultPeerDepAnalyzer } from "./peer-dep-analyzer.js";
 import { verdictEngine as defaultVerdictEngine } from "./verdict-engine.js";
+import { StringReferenceAnalyzer } from "./string-reference/analyzer.js";
+import { DetectorRegistry } from "./string-reference/registry.js";
 import { PackageNotFoundError } from "../errors/index.js";
 import type {
   AnalyzerOptions,
@@ -21,6 +23,7 @@ import type {
   ISourceFileScanner,
   IImportAggregator,
   VerdictContext,
+  IStringReferenceAnalyzer,
 } from "../types/index.js";
 import { getNativeAlternatives } from "../rules/native-alternatives.js";
 import { hasDuplicatesInstalled } from "../rules/duplicate-categories.js";
@@ -45,6 +48,7 @@ export interface UsageAnalyzerDependencies {
   packageJsonReader?: IPackageJsonReader;
   sourceFileScanner?: ISourceFileScanner;
   importAggregator?: IImportAggregator;
+  stringReferenceAnalyzer?: IStringReferenceAnalyzer;
 }
 
 export class UsageAnalyzer {
@@ -60,6 +64,7 @@ export class UsageAnalyzer {
   private readonly packageJsonReader: IPackageJsonReader;
   private readonly sourceFileScanner: ISourceFileScanner;
   private readonly importAggregator: IImportAggregator;
+  private readonly stringReferenceAnalyzer: IStringReferenceAnalyzer;
 
   constructor(
     options: Partial<AnalyzerOptions> = {},
@@ -86,6 +91,17 @@ export class UsageAnalyzer {
     this.packageJsonReader = deps.packageJsonReader ?? defaultPackageJsonReader;
     this.sourceFileScanner = deps.sourceFileScanner ?? defaultSourceFileScanner;
     this.importAggregator = deps.importAggregator ?? defaultImportAggregator;
+    const srConfig = this.options.stringReferences;
+    const disabledDetectors =
+      srConfig?.disable === "all"
+        ? ["package-json-scripts", "vitest-config", "vite-config", "next-config", "storybook-config"]
+        : (srConfig?.disable ?? []);
+    this.stringReferenceAnalyzer =
+      deps.stringReferenceAnalyzer ??
+      new StringReferenceAnalyzer(
+        DetectorRegistry.withBuiltins(disabledDetectors),
+        this.logger
+      );
   }
 
   /**
@@ -136,6 +152,14 @@ export class UsageAnalyzer {
     // Analyze all imports
     const allImports = await this.collectImports(sourceFiles);
     this.logger.debug(`Found ${allImports.length} total imports`);
+
+    // Augment with string-referenced packages (config files, package.json scripts)
+    const installedSet = new Set(Object.keys(allDeps));
+    const stringRefs = await this.stringReferenceAnalyzer.collect(projectPath, installedSet);
+    if (stringRefs.length > 0) {
+      this.logger.debug(`Found ${stringRefs.length} string reference(s) in config files`);
+      allImports.push(...stringRefs);
+    }
 
     // Group imports by package
     const importsByPackage = this.importAggregator.groupByPackage(allImports);

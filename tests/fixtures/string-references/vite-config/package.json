@@ -1,0 +1,7 @@
+{
+  "name": "test-vite-config",
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.0",
+    "vite": "^5.0.0"
+  }
+}

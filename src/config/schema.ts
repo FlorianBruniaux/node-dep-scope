@@ -119,6 +119,25 @@ export const depScopeConfigSchema = z.object({
    * Available: "minimal", "react", "node"
    */
   extends: z.union([z.string(), z.array(z.string())]).optional(),
+
+  /**
+   * String-reference detection for config files and package.json scripts.
+   * Enabled by default. Use `disable` to opt-out of specific detectors.
+   */
+  stringReferences: z
+    .object({
+      /**
+       * IDs of built-in detectors to disable. Use "all" to disable everything.
+       * Available: "package-json-scripts" | "vitest-config" | "vite-config" | "next-config" | "storybook-config"
+       */
+      disable: z
+        .union([
+          z.array(z.string()),
+          z.literal("all"),
+        ])
+        .optional(),
+    })
+    .optional(),
 });
 
 export type DepScopeConfig = z.infer<typeof depScopeConfigSchema>;
@@ -140,6 +159,7 @@ export interface ResolvedConfig {
   wellKnownPatterns: WellKnownPattern[];
   nativeAlternatives: CustomNativeAlternative[];
   duplicateCategories: CustomDuplicateCategory[];
+  stringReferences: { disable?: string[] | "all" };
 }
 
 /**

@@ -1,0 +1,16 @@
+{
+  "name": "florent-regression",
+  "version": "1.0.0",
+  "scripts": {
+    "format": "oxfmt .",
+    "lint": "oxlint --fix src/"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "oxfmt": "^0.1.0",
+    "oxlint": "^0.3.0",
+    "@storybook/addon-mcp": "^0.1.0",
+    "@svgr/webpack": "^8.0.0",
+    "jsdom": "^24.0.0"
+  }
+}

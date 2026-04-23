@@ -17,7 +17,7 @@ import { isKnipAvailable } from "../integrations/knip.js";
 import { generateMigration, getOrBuildTemplate } from "../migration/index.js";
 import type { MigrationContext } from "../migration/types.js";
 
-const VERSION = "0.3.11";
+const VERSION = "0.4.0";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
