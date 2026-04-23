@@ -2,6 +2,8 @@
 
 Copy-paste these prompts into Claude Code, Cursor, Copilot Chat, or any AI assistant to get an immediate, guided dep-scope audit. No slash command setup required.
 
+> **Using an MCP-compatible editor?** Configure the dep-scope MCP server (see [README](../README.md#mcp-server)) and ask your AI to call `scan_project` or `generate_migration_prompt` directly — no CLI, no copy-paste. The prompts below are for editors without MCP support or for one-off use.
+
 ## Full audit: one-shot prompt
 
 ```

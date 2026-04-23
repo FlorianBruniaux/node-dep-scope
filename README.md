@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/FlorianBruniaux/node-dep-scope/actions/workflows/ci.yml/badge.svg)](https://github.com/FlorianBruniaux/node-dep-scope/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/@florianbruniaux/dep-scope.svg)](https://www.npmjs.com/package/@florianbruniaux/dep-scope)
+[![MCP Registry](https://img.shields.io/badge/MCP-registry.modelcontextprotocol.io-6366f1)](https://registry.modelcontextprotocol.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org/)
 
@@ -61,15 +62,28 @@ Action Items:
 | Monorepo workspace support | ⚠️ | ❌ | ❌ | ✅ |
 | Duplicate detection | ❌ | ❌ | ❌ | ✅ |
 | LLM migration prompt | ❌ | ❌ | ❌ | ✅ |
+| MCP Server (AI editors) | ❌ | ❌ | ❌ | ✅ |
 | OSS / free | ✅ | ✅ | ❌ enterprise | ✅ |
 
 **Recommendation**: Use Knip for unused detection, dep-scope for deeper analysis and migration. They work well together (dep-scope auto-detects Knip if installed).
 
 ## Installation
 
+**CLI (global):**
+
 ```bash
 npm install -g @florianbruniaux/dep-scope
 ```
+
+**Without installation:**
+
+```bash
+npx @florianbruniaux/dep-scope scan
+```
+
+**MCP Server (AI editors — no CLI needed):**
+
+Add to your editor's MCP config and the server runs on demand via npx. See the [MCP Server](#mcp-server) section below for per-editor config snippets.
 
 **From source:**
 
@@ -77,12 +91,6 @@ npm install -g @florianbruniaux/dep-scope
 git clone https://github.com/FlorianBruniaux/node-dep-scope.git
 cd node-dep-scope
 npm install && npm run build && npm install -g .
-```
-
-**Without installation:**
-
-```bash
-npx @florianbruniaux/dep-scope scan
 ```
 
 ## Quick Start
@@ -144,6 +152,8 @@ Auto-detection covers: `src`, `app`, `lib`, `pages`, `components`, `hooks`, `ser
 
 dep-scope exposes a **Model Context Protocol server** so AI editors (Claude Code, Cursor, Windsurf) can query your dependencies inline — no CLI, no markdown files, no copy-paste.
 
+> Listed on the [official MCP Registry](https://registry.modelcontextprotocol.io): **`io.github.FlorianBruniaux/dep-scope`**
+
 ### Available tools
 
 | Tool | Params | What it does |
@@ -156,7 +166,9 @@ dep-scope exposes a **Model Context Protocol server** so AI editors (Claude Code
 
 ### Setup
 
-**Claude Code (global — all projects):** add to `~/.claude.json`:
+Add the following `mcpServers` entry to your editor's config. The server runs on demand via `npx` — no global install required.
+
+**Claude Code** — `~/.claude.json`:
 
 ```json
 {
@@ -169,7 +181,7 @@ dep-scope exposes a **Model Context Protocol server** so AI editors (Claude Code
 }
 ```
 
-**Claude Desktop:** add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+**Claude Desktop** — `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
@@ -182,15 +194,40 @@ dep-scope exposes a **Model Context Protocol server** so AI editors (Claude Code
 }
 ```
 
-**Cursor / Windsurf:** same `mcpServers` block in their respective MCP config files.
+**Cursor** — `~/.cursor/mcp.json`:
 
-Once connected, Claude can call `scan_project` or `generate_migration_prompt` directly mid-session without any manual command.
+```json
+{
+  "mcpServers": {
+    "dep-scope": {
+      "command": "npx",
+      "args": ["--package=@florianbruniaux/dep-scope", "-y", "dep-scope-mcp"]
+    }
+  }
+}
+```
+
+**Windsurf** — `~/.codeium/windsurf/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "dep-scope": {
+      "command": "npx",
+      "args": ["--package=@florianbruniaux/dep-scope", "-y", "dep-scope-mcp"]
+    }
+  }
+}
+```
+
+Once connected, you can ask your AI editor to call `scan_project` or `generate_migration_prompt` directly mid-session without running any CLI command.
 
 ## Documentation
 
 - [Commands reference](docs/commands.md)
 - [Configuration](docs/configuration.md)
 - [AI prompts + Claude Code slash command](docs/ai-prompts.md)
+- [MCP Server setup](#mcp-server)
 - [Programmatic API](docs/api.md)
 - [Architecture & internals](docs/architecture.md)
 
