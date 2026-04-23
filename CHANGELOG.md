@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.9] - 2026-04-23
+
+### Added
+
+- **MCP Server** (`src/mcp/server.ts`): dep-scope now ships a Model Context Protocol server (`dep-scope-mcp` bin) that exposes 5 tools to any MCP-compatible AI editor (Claude Code, Cursor, Windsurf, Claude Desktop): `scan_project`, `analyze_package`, `get_migration_candidates`, `generate_migration_prompt`, `find_duplicates`. AI agents can query dependency analysis inline mid-session without invoking the CLI or piping markdown files. Configure once in `~/.claude.json` (Claude Code) or the equivalent MCP config file for other editors.
+  - `scan_project` params: `projectPath`, `srcPaths` (override scan directories, use `["."]` for full root), `threshold`, `includeDev`, `checkDuplicates`, `checkTransitive` (transitive polyfill detection via e18e database), `withKnip` (auto-detected by default).
+  - `analyze_package` params: `packageName`, `projectPath`, `srcPaths`.
+
 ## [0.3.8] - 2026-04-22
 
 ### Added

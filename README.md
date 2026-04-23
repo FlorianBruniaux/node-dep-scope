@@ -140,6 +140,52 @@ Auto-detection covers: `src`, `app`, `lib`, `pages`, `components`, `hooks`, `ser
 
 > **False positive "unused" verdict?** The package may be used in a directory outside the scan scope (`scripts/`, `tools/`, etc.). Run `dep-scope scan --root` to verify before removing anything. When a removal recommendation appears with a narrow scan scope, dep-scope will warn you.
 
+## MCP Server
+
+dep-scope exposes a **Model Context Protocol server** so AI editors (Claude Code, Cursor, Windsurf) can query your dependencies inline — no CLI, no markdown files, no copy-paste.
+
+### Available tools
+
+| Tool | Params | What it does |
+|---|---|---|
+| `scan_project` | `projectPath`, `srcPaths`, `threshold`, `includeDev`, `checkDuplicates`, `checkTransitive`, `withKnip` | Full dependency scan with verdicts |
+| `analyze_package` | `packageName`, `projectPath`, `srcPaths` | Symbol-level breakdown of one package |
+| `get_migration_candidates` | `projectPath` | List all RECODE_NATIVE + CONSOLIDATE packages |
+| `generate_migration_prompt` | `packageName`, `projectPath` | Generate a migration prompt inline |
+| `find_duplicates` | `projectPath` | Detect overlapping libraries |
+
+### Setup
+
+**Claude Code (global — all projects):** add to `~/.claude.json`:
+
+```json
+{
+  "mcpServers": {
+    "dep-scope": {
+      "command": "npx",
+      "args": ["--package=@florianbruniaux/dep-scope", "-y", "dep-scope-mcp"]
+    }
+  }
+}
+```
+
+**Claude Desktop:** add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "dep-scope": {
+      "command": "npx",
+      "args": ["--package=@florianbruniaux/dep-scope", "-y", "dep-scope-mcp"]
+    }
+  }
+}
+```
+
+**Cursor / Windsurf:** same `mcpServers` block in their respective MCP config files.
+
+Once connected, Claude can call `scan_project` or `generate_migration_prompt` directly mid-session without any manual command.
+
 ## Documentation
 
 - [Commands reference](docs/commands.md)

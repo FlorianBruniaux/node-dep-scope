@@ -29,3 +29,6 @@ audit-report.md
 
 # MCP local config (machine-specific absolute paths)
 .mcp.json
+
+# Local planning docs (non-versioned)
+claudedocs/
