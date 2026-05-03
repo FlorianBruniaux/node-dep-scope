@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-05-03
+
+### Fixed
+
+- **Windows path separator bug** (issue #1): `path.join()` generates backslashes on Windows, which `fast-glob` cannot handle. Source file scanning now normalizes all paths to forward slashes before building glob patterns. Affected: `source-file-scanner.ts`, `src-paths-resolver.ts`, `workspace-detector.ts`. Users on Windows were getting "No source files found" and "Total dependencies: 0" regardless of their `srcPaths` config.
+
 ## [0.4.0] - 2026-04-23
 
 ### Added
