@@ -52,7 +52,8 @@ export function resolveSrcPaths(
 
   if (existing.length > 0) {
     // At least one configured path exists — use only the existing ones
-    return existing.map((p) => path.relative(projectPath, p) || ".");
+    // Always return forward-slash paths so fast-glob works on Windows
+    return existing.map((p) => (path.relative(projectPath, p) || ".").replace(/\\/g, "/"));
   }
 
   // None of the configured paths exist — auto-detect

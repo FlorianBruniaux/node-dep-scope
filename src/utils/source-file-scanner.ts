@@ -60,9 +60,10 @@ export class SourceFileScanner implements ISourceFileScanner {
     ignorePatterns: string[]
   ): Promise<string[]> {
     const extensions = SourceFileScanner.DEFAULT_EXTENSIONS.join(",");
-    const patterns = srcPaths.map((srcPath) =>
-      path.join(projectPath, srcPath, `**/*.{${extensions}}`)
-    );
+    const patterns = srcPaths.map((srcPath) => {
+      const base = path.join(projectPath, srcPath).replace(/\\/g, "/");
+      return `${base}/**/*.{${extensions}}`;
+    });
 
     // Build ignore patterns for fast-glob
     // Always ignore node_modules at any depth to handle monorepo sub-packages

@@ -178,11 +178,12 @@ function buildSrcPaths(packageDirs: string[]): string[] {
   const srcPaths: string[] = [];
 
   for (const pkg of packageDirs) {
-    // Add common source directories for each package
+    // Use forward slashes so fast-glob works on Windows
+    const fwdPkg = pkg.replace(/\\/g, "/");
     srcPaths.push(
-      path.join(pkg, "src"),
-      path.join(pkg, "lib"),
-      pkg // Fallback to package root (for packages without src/)
+      `${fwdPkg}/src`,
+      `${fwdPkg}/lib`,
+      fwdPkg // Fallback to package root (for packages without src/)
     );
   }
 
