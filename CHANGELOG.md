@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - 2026-05-05
+
+### Fixed
+
+- **Workspace auto-detection**: `dep-scope scan` now automatically enters workspace mode when a `pnpm-workspace.yaml`, `lerna.json`, or `package.json#workspaces` is found at the project root. No need to pass `--each-workspace` manually. Use `--no-auto-detect` to opt out.
+- **False REMOVE verdicts in workspace packages**: Added `test`, `tests`, and `types` directories to the auto-detection candidates in `src-paths-resolver.ts`. Packages that only have source files outside `src/` or `lib/` were incorrectly flagged as unused.
+- **Investigate noise without alternatives**: The `Investigate` section now only appears for packages that have a known native alternative. Low-usage packages with no replacement are no longer surfaced, making the output fully actionable.
+- **Workspace package sort order**: Packages in `--each-workspace` mode are now sorted alphabetically, making the output consistent and easier to scan regardless of `pnpm-workspace.yaml` glob order.
+
 ## [0.4.1] - 2026-05-03
 
 ### Fixed

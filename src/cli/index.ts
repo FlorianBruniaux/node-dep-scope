@@ -33,7 +33,7 @@ import { PackageJsonReader } from "../utils/package-json-reader.js";
 import { detectWorkspace } from "../utils/workspace-detector.js";
 import type { MigrationContext } from "../migration/types.js";
 
-const VERSION = "0.4.1";
+const VERSION = "0.4.2";
 
 const VALID_FORMATS = ["console", "markdown", "json"] as const;
 type Format = (typeof VALID_FORMATS)[number];
@@ -221,6 +221,15 @@ program
       // autoDetect is false when --no-auto-detect is used
       const autoDetectWorkspace = options.autoDetect !== false;
 
+      // Auto-promote to workspace mode when monorepo is detected and user hasn't opted out
+      if (!options.eachWorkspace && autoDetectWorkspace && !options.src && !options.root) {
+        const detected = await detectWorkspace(projectPath);
+        if (detected.type !== "none" && detected.packages.length > 0) {
+          console.log(pc.dim(`Auto-detected ${detected.type} workspace (${detected.packages.length} packages). Use --no-auto-detect to scan as a single project.\n`));
+          options.eachWorkspace = true;
+        }
+      }
+
       // ── Workspace mode: scan each package individually ──────────────────
       if (options.eachWorkspace) {
         const workspace = await detectWorkspace(projectPath);
@@ -237,7 +246,7 @@ program
         const allResults: ScanResult[] = [];
         let hasAnyIssues = false;
 
-        for (const pkgRelDir of workspace.packages) {
+        for (const pkgRelDir of [...workspace.packages].sort()) {
           const pkgPath = path.join(projectPath, pkgRelDir);
 
           // Skip if no package.json

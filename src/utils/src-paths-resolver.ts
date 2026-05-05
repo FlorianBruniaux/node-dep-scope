@@ -21,6 +21,9 @@ const COMMON_SRC_DIRS = [
   "tools",
   "bin",
   "cli",
+  "test",
+  "tests",
+  "types",
 ];
 
 /** Next.js specific directories to try first */

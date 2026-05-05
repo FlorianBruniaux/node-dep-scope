@@ -207,11 +207,13 @@ export class ConsoleReporter {
       console.log("");
     }
 
-    // Investigate (skip if actionableOnly)
+    // Investigate: only show packages that have known native alternatives
     if (!actionableOnly) {
-      const toInvestigate = actionItems.filter((d) => d.verdict === "INVESTIGATE");
+      const toInvestigate = actionItems.filter(
+        (d) => d.verdict === "INVESTIGATE" && d.alternatives.length > 0
+      );
       if (toInvestigate.length > 0) {
-        console.log(`  ${pc.magenta("Investigate:")}`);
+        console.log(`  ${pc.magenta("Investigate (native alternatives available):")}`);
         for (const dep of toInvestigate) {
           const reason = dep.investigateReason
             ? pc.dim(` [${formatInvestigateReason(dep.investigateReason)}]`)
